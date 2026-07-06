@@ -535,18 +535,20 @@ function exposeTestAPI() {
       renderer.setRenderTarget(null);
       camera.aspect = oldAspect; camera.updateProjectionMatrix();
       rt.dispose();
-      let lit = 0; const avg = [0, 0, 0];
-      const cx = size >> 1, cy = size >> 1, R = size * 0.35;
-      let cLit = 0, cN = 0;
+      let lit = 0; const avg = [0, 0, 0], cAvg = [0, 0, 0];
+      const cx = size >> 1, cy = size >> 1, R = size * 0.35, Rc = size * 0.14;
+      let cLit = 0, cN = 0, ccN = 0;
       for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
         const i = (y * size + x) * 4, r = buf[i], g = buf[i + 1], b = buf[i + 2];
         avg[0] += r; avg[1] += g; avg[2] += b;
         const bg = Math.abs(r - 200) + Math.abs(g - 225) + Math.abs(b - 210) > 70;
         if (bg) lit++;
-        if ((x - cx) ** 2 + (y - cy) ** 2 < R * R) { cN++; if (bg) cLit++; }
+        const dd = (x - cx) ** 2 + (y - cy) ** 2;
+        if (dd < R * R) { cN++; if (bg) cLit++; }
+        if (dd < Rc * Rc) { ccN++; cAvg[0] += r; cAvg[1] += g; cAvg[2] += b; }
       }
       const n = size * size;
-      return { avg: avg.map((v) => Math.round(v / n)), litRatio: +(lit / n).toFixed(3), centerLit: +(cLit / cN).toFixed(3) };
+      return { avg: avg.map((v) => Math.round(v / n)), centerAvg: cAvg.map((v) => Math.round(v / ccN)), litRatio: +(lit / n).toFixed(3), centerLit: +(cLit / cN).toFixed(3) };
     },
     // CPU 端場景圖檢查(不需 GPU,hidden 分頁也可驗證幾何是否正確建構)
     inspect() {
