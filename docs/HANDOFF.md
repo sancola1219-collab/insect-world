@@ -135,9 +135,12 @@ state.tourIdx  null 或 0..7(導覽進度)
   # 開 Pages:PUT /repos/sancola1219-collab/insect-world/pages  source=main /
   ```
   (PowerShell 5.1 管線餵 secret 會壞,一律用 bash——見 [[lesson-ps51-stdin-pipe]]。)
-- 純靜態、無 build 步驟:push 到 main 之後 Pages 直接服務根目錄。
-- **已發佈**:repo `sancola1219-collab/insect-world`,線上 **https://sancola1219-collab.github.io/insect-world/**(Pages 服務 main 根目錄)。
-- 發佈時踩到的兩點:(1) 帳號是 user 非 org → 建 repo 走 `POST /user/repos`(不是 `/orgs/.../repos`)。(2) 含中文的 repo description 直接放進 bash 的 `-d` 字串會 `400 Problems parsing JSON`(Git Bash 編碼) → 改把 JSON 寫成 UTF-8 檔,用 `--data-binary @file` 送。(3) 首發時 GitHub Pages build 佇列可能異常慢(>15 分才 200),但 config 正確就會上,靜待即可。
+- **已發佈**:repo `sancola1219-collab/insect-world`,線上 **https://sancola1219-collab.github.io/insect-world/**。
+- **部署機制:GitHub Actions**(`.github/workflows/deploy.yml`,用 `upload-pages-artifact` + `deploy-pages` 部署整個根目錄)。push 到 main 即自動重建,約 1 分鐘上線,穩定可靠。
+- 發佈時踩到的坑(依序):
+  1. 帳號是 **user 非 org** → 建 repo 走 `POST /user/repos`(不是 `/orgs/.../repos`,否則 404)。
+  2. 含中文的 repo description 直接放進 bash 的 `-d` 字串會 `400 Problems parsing JSON`(Git Bash 編碼) → 把 JSON 寫成 UTF-8 檔,用 `--data-binary @file` 送。
+  3. **legacy(Jekyll)builder 會卡死**:首次成功後,後續每次 build 都卡在 `building` 約 18 分鐘然後 `errored`(error message 為 null,GitHub 狀態頁卻 All Operational),線上一直停在舊版。`.nojekyll` 沒用。**解法:改用 GitHub Actions 部署** —— API `PUT /repos/.../pages` 設 `{"build_type":"workflow"}`,加上上述 workflow 檔,push 後 Actions 一次就綠、`lifecycle.js` 立刻 200。(這台機器的 PAT 有 `workflow` scope,可直接 push `.github/workflows/`。)
 
 ## 6. 路線圖(未完成的擴充方向,依價值排序)
 
