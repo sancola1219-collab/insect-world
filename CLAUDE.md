@@ -18,4 +18,4 @@ node tools/serve.mjs 8137   →  http://localhost:8137/
 
 ## 加一種昆蟲
 
-`data.js` 加一筆(含 `builder` 名、`anatomy` 的 part key)→ `insects.js` 寫對應 builder(回傳 `{group, anchors, animate, baseLength}`,anchor key 要對得上 anatomy)→ `habitat.js` 的 `LAYOUT` 給牠一個家與棲息型態。用 `__IW.inspect().anchorsOK` 確認標註對得上。
+`data.js` 加一筆(含 `builder` 名、`anatomy` 的 part key)+ `LIFE` 加一筆(變態型態)→ `insects.js` 寫對應 builder(回傳 `{group, anchors, animate, baseLength}`,anchor key 要對得上 anatomy;翅膀用 `wingMesh` 才會被標 `isWing`)→ `habitat.js` 的 `LAYOUT` 給牠一個家與棲息型態。用 `__IW.inspect().anchorsOK` 確認標註對得上、`__IW.lifecycle()` 確認四階段正常。

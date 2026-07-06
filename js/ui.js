@@ -12,6 +12,9 @@ export function createUI(handlers) {
     tourPrev: $('tour-prev'), tourNext: $('tour-next'), tourExit: $('tour-exit'),
     btnHelp: $('btn-help'), helpOverlay: $('help-overlay'), btnCloseHelp: $('btn-close-help'),
     sceneRoot: $('scene-root'),
+    lifeBar: $('life-bar'), lifeTrack: $('life-track'), lifeKind: $('life-kind'),
+    lifeName: $('life-name'), lifeDesc: $('life-desc'),
+    lifePrev: $('life-prev'), lifePlay: $('life-play'), lifeNext: $('life-next'), lifeClose: $('life-close'),
   };
 
   // 標註層(疊在畫布上的 DOM 標籤)
@@ -43,6 +46,13 @@ export function createUI(handlers) {
   el.tourExit.addEventListener('click', () => handlers.onTourExit());
   el.btnHelp.addEventListener('click', () => el.helpOverlay.classList.remove('hidden'));
   el.btnCloseHelp.addEventListener('click', () => el.helpOverlay.classList.add('hidden'));
+  // 生命週期播放器控制
+  el.lifePrev.addEventListener('click', () => handlers.onLifeNav(-1));
+  el.lifeNext.addEventListener('click', () => handlers.onLifeNav(1));
+  el.lifePlay.addEventListener('click', () => handlers.onLifeToggle());
+  el.lifeClose.addEventListener('click', () => handlers.onLifeClose());
+  // 資料卡內「播放變態」鈕(infoBody 內容會重建,用事件委派)
+  el.infoBody.addEventListener('click', (e) => { if (e.target.closest('[data-life]')) handlers.onLifecycle(); });
 
   // ---- 對外方法 ----
   function hideLoader() { el.loader.classList.add('gone'); setTimeout(() => (el.loader.style.display = 'none'), 700); }
@@ -106,9 +116,38 @@ export function createUI(handlers) {
   }
   function hideTour() { el.tourBar.classList.add('hidden'); el.btnTour.classList.remove('on'); }
 
+  // ---- 生命週期播放器 ----
+  const kindLabel = (metaType) => metaType.indexOf('不完全') >= 0 ? '不完全變態' : '完全變態';
+  function showLifecycle(sp) {
+    // 建四階段進度軌
+    el.lifeTrack.innerHTML = '';
+    sp.meta.stages.forEach(([name], i) => {
+      const step = document.createElement('div');
+      step.className = 'life-step'; step.dataset.i = i;
+      step.innerHTML = `<span class="life-dot">${i + 1}</span><span class="life-step-label">${name}</span>`;
+      step.addEventListener('click', () => handlers.onLifeGoto(i));
+      el.lifeTrack.appendChild(step);
+    });
+    el.lifeKind.textContent = kindLabel(sp.meta.type);
+    el.lifeBar.classList.remove('hidden');
+  }
+  function setLifeStage(sp, idx) {
+    const [name, desc] = sp.meta.stages[idx];
+    el.lifeName.textContent = name;
+    el.lifeDesc.textContent = desc;
+    el.lifeTrack.querySelectorAll('.life-step').forEach((n) => {
+      const i = +n.dataset.i;
+      n.classList.toggle('active', i === idx);
+      n.classList.toggle('done', i < idx);
+    });
+  }
+  function setLifePlaying(on) { el.lifePlay.textContent = on ? '❚❚' : '▶'; el.lifePlay.classList.toggle('on', on); }
+  function hideLifecycle() { el.lifeBar.classList.add('hidden'); }
+
   return {
     hideLoader, setView, setActiveSpecies, showInfo, hideInfo, setScaleReadout,
     setAnatomy, setMotion, buildLabels, positionLabels, showTour, hideTour,
+    showLifecycle, setLifeStage, setLifePlaying, hideLifecycle,
     sceneRoot: el.sceneRoot,
   };
 }
@@ -128,7 +167,7 @@ function infoHTML(sp) {
     <p class="info-tag">${sp.tagline}</p>
     <div class="info-stats">${stats}</div>
     <div class="section">
-      <div class="section-h">生命週期 · ${sp.meta.type}</div>
+      <div class="section-h">生命週期 · ${sp.meta.type}<button class="mini-btn" data-life>▶ 3D 演示</button></div>
       <div class="stages">${stages}</div>
     </div>
     <div class="section">

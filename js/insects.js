@@ -82,6 +82,7 @@ function wingMesh(len, wid, mat, curveBack = 0.35) {
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   const m = new THREE.Mesh(g, mat);
   m.rotation.x = -Math.PI / 2; // 平躺
+  m.userData.isWing = true;    // 供生命週期「若蟲去翅」辨識
   return m;
 }
 

@@ -515,5 +515,24 @@ export const OVERVIEW_INTRO = {
   text: '這是一片盛夏的草地。八種台灣常見昆蟲在此活動——空中的蝴蝶與蜻蜓、花上的蜜蜂與瓢蟲、葉間的螳螂與蝗蟲、地面的螞蟻與樹幹上的獨角仙。點選任何一種,靠近牠、認識牠。',
 };
 
+// 變態生命週期的 3D 呈現設定(對應 meta.stages 的四階段)
+//   kind 'complete'  完全變態 → [卵, 幼蟲(larva), 蛹(pupa), 成蟲]
+//   kind 'incomplete' 不完全變態 → [卵, 若蟲, 蛻皮前若蟲, 成蟲];若蟲由「成蟲去翅縮小」即時生成
+//   larva: 幼蟲外形原型;pupa: 蛹外形原型;glow: 幼期是否發光(螢火蟲)
+export const LIFE = {
+  butterfly:  { kind: 'complete',   larva: 'caterpillar', pupa: 'chrysalis' },
+  beetle:     { kind: 'complete',   larva: 'grub',        pupa: 'mummy' },
+  bee:        { kind: 'complete',   larva: 'maggot',      pupa: 'mummy' },
+  dragonfly:  { kind: 'incomplete' },
+  ladybug:    { kind: 'complete',   larva: 'alligator',   pupa: 'mummy' },
+  mantis:     { kind: 'incomplete' },
+  ant:        { kind: 'complete',   larva: 'maggot',      pupa: 'cocoon' },
+  grasshopper:{ kind: 'incomplete' },
+  cicada:     { kind: 'incomplete' },
+  stagbeetle: { kind: 'complete',   larva: 'grub',        pupa: 'mummy' },
+  stickinsect:{ kind: 'incomplete' },
+  firefly:    { kind: 'complete',   larva: 'alligator',   pupa: 'mummy', glow: true },
+};
+
 // 依 id 取資料
 export const byId = (id) => INSECTS.find((s) => s.id === id) || null;

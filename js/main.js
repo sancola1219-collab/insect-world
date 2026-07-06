@@ -10,7 +10,8 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createHabitat } from './habitat.js';
 import { createUI } from './ui.js';
-import { INSECTS, byId, TOUR_ORDER, OVERVIEW_INTRO } from './data.js';
+import { buildStages } from './lifecycle.js';
+import { INSECTS, byId, TOUR_ORDER, OVERVIEW_INTRO, LIFE } from './data.js';
 
 const state = {
   view: 'habitat',   // 'habitat' | 'focus'
@@ -18,7 +19,11 @@ const state = {
   anatomy: false,
   motion: true,
   tourIdx: null,     // null 或 0..n-1
+  lifeStage: null,   // null 或 0..3(變態階段)
+  lifePlaying: false,
 };
+const LIFE_INTERVAL = 2.6;   // 自動播放每階段秒數
+let lifeTimer = 0;
 
 let renderer, scene, camera, controls, habitat, ui;
 let simT = 0;                       // 模擬秒(idle 動畫的純函數輸入)
@@ -71,6 +76,11 @@ function init() {
     onTour: () => (state.tourIdx === null ? startTour() : stopTour()),
     onTourNav: (d) => tourNav(d),
     onTourExit: () => stopTour(),
+    onLifecycle: () => openLifecycle(),
+    onLifeNav: (d) => gotoLifeStage((state.lifeStage ?? 0) + d),
+    onLifeGoto: (i) => gotoLifeStage(i),
+    onLifeToggle: () => setLifePlaying(!state.lifePlaying),
+    onLifeClose: () => closeLifecycle(true),
   });
 
   // 讓載入畫面先繪出,再做重活(建構所有昆蟲與程序化貼圖)
@@ -115,6 +125,7 @@ function addLights() {
 // ---------- 狀態切換 ----------
 function focusSpecies(id, animate) {
   const sp = byId(id); const st = habitat.stations.get(id); if (!sp || !st) return;
+  if (state.lifeStage !== null) closeLifecycle(false); // 切換昆蟲前先收掉生命週期
   // 狀態即時
   state.view = 'focus'; state.focus = id;
   st.focused = true;
@@ -129,6 +140,7 @@ function focusSpecies(id, animate) {
 }
 
 function goOverview(animate) {
+  if (state.lifeStage !== null) closeLifecycle(false);
   state.view = 'habitat'; state.focus = null;
   habitat && habitat.stations.forEach((s) => (s.focused = false));
   ui.setActiveSpecies(null);
@@ -157,10 +169,55 @@ function applyTour() {
   ui.showTour(byId(id), state.tourIdx, TOUR_ORDER.length);
 }
 
+// ---------- 生命週期(變態)播放器 ----------
+function ensureStages(st, sp) {
+  if (st.life) return st.life;
+  const stages = buildStages(sp, st.insect, LIFE[sp.id]);   // [卵,幼/若,蛹/若,{adult}]
+  const s = st.inner.scale.x;                               // 站點真實比例
+  const radii = stages.map((e) => (e.adult ? st.radius : e.baseLength * s));
+  stages.forEach((e) => { if (e.group) { e.group.visible = false; e.group.traverse((o) => { if (o.isMesh) o.castShadow = true; }); st.inner.add(e.group); } });
+  st.life = { stages, radii };
+  return st.life;
+}
+function openLifecycle() {
+  if (!state.focus) return;
+  const sp = byId(state.focus); const st = habitat.stations.get(state.focus);
+  ensureStages(st, sp);
+  ui.showLifecycle(sp);
+  state.lifePlaying = true; ui.setLifePlaying(true);
+  lifeTimer = 0;
+  gotoLifeStage(0);
+}
+function gotoLifeStage(i) {
+  if (!state.focus) return;
+  const sp = byId(state.focus); const st = habitat.stations.get(state.focus);
+  const life = ensureStages(st, sp);
+  const idx = ((i % 4) + 4) % 4;
+  state.lifeStage = idx;
+  // 顯示對應階段:props 只留當前;成蟲階段顯示真正的成蟲模型
+  life.stages.forEach((e, k) => { if (e.group) e.group.visible = (k === idx); });
+  st.insect.group.visible = life.stages[idx].adult === true;
+  ui.setLifeStage(sp, idx);
+  flyToStageRadius(st, life.radii[idx], true);
+  lifeTimer = 0;
+}
+function setLifePlaying(on) { state.lifePlaying = on; ui.setLifePlaying(on); }
+function closeLifecycle(reframe) {
+  if (state.focus) {
+    const st = habitat.stations.get(state.focus);
+    if (st && st.life) st.life.stages.forEach((e) => { if (e.group) e.group.visible = false; });
+    if (st) st.insect.group.visible = true;
+    if (reframe && st) flyToStation(st, true);
+  }
+  state.lifeStage = null; state.lifePlaying = false;
+  ui.hideLifecycle();
+}
+
 // ---------- 相機 ----------
-function flyToStation(st, animate) {
+function flyToStation(st, animate) { flyToStageRadius(st, st.radius, animate); }
+function flyToStageRadius(st, radius, animate) {
   const target = st.worldPos();
-  const dist = st.radius * 4.4 + 0.35;
+  const dist = radius * 4.4 + 0.3;
   const dir = new THREE.Vector3(0.9, 0.55, 1.15).normalize();
   const camPos = target.clone().add(dir.multiplyScalar(dist));
   flyTo(camPos, target, animate);
@@ -202,9 +259,22 @@ function tick(dt) {
   lastFrame = now();
   simT += (state.motion ? dt : dt * 0.15); // 停動作時仍讓相機/微動運作
   if (habitat) habitat.update(simT, dt, state.motion);
+  updateLifecycle(dt);
   updateCamera(dt);
-  if (state.anatomy && state.view === 'focus') updateLabels(); else ui.positionLabels([]);
+  const showLabels = state.anatomy && state.view === 'focus' && state.lifeStage === null;
+  if (showLabels) updateLabels(); else ui.positionLabels([]);
   if (!contextLost) renderer.render(scene, camera);
+}
+
+function updateLifecycle(dt) {
+  if (state.lifeStage === null || !state.focus) return;
+  const st = habitat.stations.get(state.focus);
+  const entry = st && st.life && st.life.stages[state.lifeStage];
+  if (entry && entry.animate) entry.animate(simT);   // 階段模型的裝飾動畫
+  if (state.lifePlaying) {
+    lifeTimer += dt;
+    if (lifeTimer >= LIFE_INTERVAL) gotoLifeStage(state.lifeStage + 1); // gotoLifeStage 會歸零 lifeTimer
+  }
 }
 
 // ---------- 構造標註投影 ----------
@@ -278,7 +348,7 @@ function realLen(sp) {
 // ---------- 測試 API(hidden browser 下的驗證入口) ----------
 function exposeTestAPI() {
   window.__IW = {
-    state: () => JSON.parse(JSON.stringify({ view: state.view, focus: state.focus, anatomy: state.anatomy, motion: state.motion, tourIdx: state.tourIdx, simT })),
+    state: () => JSON.parse(JSON.stringify({ view: state.view, focus: state.focus, anatomy: state.anatomy, motion: state.motion, tourIdx: state.tourIdx, lifeStage: state.lifeStage, lifePlaying: state.lifePlaying, simT })),
     species: () => INSECTS.map((s) => s.id),
     forceSize(w, h) { renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); return [w, h]; },
     step(ms = 16) { tick(ms / 1000); return simT; },
@@ -289,6 +359,28 @@ function exposeTestAPI() {
     setMotion(on) { setMotion(!!on); return state.motion; },
     tour() { startTour(); return state.tourIdx; },
     tourNav(d) { tourNav(d); return state.tourIdx; },
+    openLifecycle() { openLifecycle(); return state.lifeStage; },
+    setLifeStage(i) { gotoLifeStage(i); return state.lifeStage; },
+    closeLifecycle() { closeLifecycle(true); return state.lifeStage; },
+    // 生命週期檢查:走過四階段,回報每階段顯示的模型 mesh 數、取景半徑、是否為成蟲
+    lifecycle() {
+      if (!state.focus) return { error: 'not focused' };
+      const sp = byId(state.focus); const st = habitat.stations.get(state.focus);
+      openLifecycle();
+      const kind = LIFE[sp.id].kind;
+      const stages = [];
+      for (let i = 0; i < 4; i++) {
+        gotoLifeStage(i);
+        const e = st.life.stages[i];
+        let meshes = 0;
+        if (e.adult) { st.insect.group.traverse((o) => { if (o.isMesh && o.visible) meshes++; }); }
+        else e.group.traverse((o) => { if (o.isMesh) meshes++; });
+        stages.push({ name: sp.meta.stages[i][0], isAdult: !!e.adult, meshes, radius: +st.life.radii[i].toFixed(3), camErr: +controls.target.distanceTo(st.worldPos()).toFixed(3) });
+      }
+      const sane = Number.isFinite(camera.position.x + controls.target.x);
+      closeLifecycle(false);
+      return { kind, adultVisibleAfterClose: st.insect.group.visible, stages, sane };
+    },
     // 相機聚焦點與昆蟲世界座標的距離(驗證取景是否對準)
     focusError() {
       if (!state.focus) return null;

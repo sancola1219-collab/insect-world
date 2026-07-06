@@ -77,6 +77,30 @@
 })()
 ```
 
+## 四、生命週期(變態)播放器
+
+```js
+(() => {
+  const IW = window.__IW; IW.forceSize(1000,700);
+  const out = {};
+  IW.focus('butterfly'); IW.settle(20); out.complete = IW.lifecycle();   // 完全變態
+  IW.focus('grasshopper'); IW.settle(10); out.incomplete = IW.lifecycle(); // 不完全變態
+  // 逐階段實際取景(要 settle)
+  IW.focus('beetle'); IW.settle(10); IW.openLifecycle();
+  out.frame = [];
+  for (let i=0;i<4;i++){ IW.setLifeStage(i); IW.settle(80); out.frame.push(+IW.focusError().toFixed(3)); }
+  IW.closeLifecycle();
+  return out;
+})()
+```
+
+**判讀基準:**
+- `lifecycle().stages` 四階段 `meshes` 都 > 0;`isAdult` 只有第 4 階段為 true;`sane === true`。
+- `complete.kind === 'complete'`、`incomplete.kind === 'incomplete'`。
+- `adultVisibleAfterClose === true`(關閉後成蟲模型還原)。
+- `frame[*]`(有 settle)相機取景誤差 < 0.15。
+- 切換昆蟲或回全景會自動關閉播放器(`state().lifeStage` 回 null、`#life-bar` 加 `hidden`)。
+
 ---
 
 ## `__IW` API 速查
@@ -92,6 +116,9 @@
 | `species()` | 所有昆蟲 id |
 | `focusError()` | 相機目標與聚焦昆蟲的距離(取景準度) |
 | `inspect()` | CPU 端逐昆蟲結構報告(mesh 數、box、anchors) |
+| `openLifecycle()` / `setLifeStage(i)` / `closeLifecycle()` | 開啟/切換/關閉變態播放器 |
+| `lifecycle()` | 走過四階段的結構報告(mesh 數、isAdult、取景半徑) |
+| `strata()` | 分層射線檢查(上/中/下命中什麼,抓單一物件蓋滿全畫面) |
 | `sampleRT(size)` | 離屏 render target 取樣,回傳 `{avg, litRatio, centerLit}` |
 | `sane()` / `contextLost()` | NaN 檢查 / GPU context 狀態 |
 | `labelCount()` / `visibleLabels()` | 構造標註 DOM 數 / 可見數 |
@@ -111,3 +138,9 @@
   - 取景:新四種 focusErr ≤ 0.05(cicada 0.006、stagbeetle 0.001、stickinsect 0、firefly 0.05);標註 firefly 6/6、stagbeetle 6/6 可見。
   - 導覽:12 站依分類故事順序走完並正確 wrap 回蝴蝶。
   - 像素:本次驗證時 hidden 分頁 context 持續 lost(`ext WEBGL_lose_context` 不可用、無法強制還原),故 sampleRT 全 0——**屬環境限制**;新四種沿用與已驗證 8 種相同的材質/幾何 helper,渲染路徑一致。決定性閘門 CPU inspect 全綠。
+
+- **2026-07-06 生命週期播放器(Claude Opus 4.8)**:新增 `js/lifecycle.js` + 播放器。
+  - `lifecycle()`:complete(蝴蝶/獨角仙/螢火蟲)四階段卵→幼蟲→蛹→成蟲,幼蟲/蛹 mesh 數各異(毛蟲 20、雞母蟲 11、螢火蟲發光幼蟲 30、懸蛹 7、裸蛹 10);incomplete(蜻蜓/蝗蟲)卵→若蟲→若蟲→成蟲,若蟲由成蟲 clone 去翅;`isAdult` 僅末階段、`sane` true、關閉後成蟲還原 true。
+  - 取景(有 settle):四階段 focusError 0.059–0.096。UI:life-bar 顯示、4 進度點、active/kind 標籤正確、播放鈕切 ❚❚。自動播放 2.6s 進一階段(0→1 驗證通過)。
+  - 清理:播放中切換昆蟲、回全景都會自動關閉(lifeStage→null、life-bar hidden)。
+  - 注意:reload 時 console 出現多筆 `THREE.WebGLProgram: VALIDATE_STATUS false`(空 info log)——是 hidden 分頁 context lost 時編譯 shader 的假象(GL 1282),非 GLSL 錯誤;context 活著時不再出現。

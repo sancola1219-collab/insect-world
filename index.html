@@ -91,6 +91,24 @@
     <button class="tour-exit" id="tour-exit">結束導覽</button>
   </div>
 
+  <!-- 生命週期播放器 -->
+  <div id="life-bar" class="hidden">
+    <div class="life-track" id="life-track"></div>
+    <div class="life-main">
+      <div class="life-caption">
+        <span class="life-kind" id="life-kind"></span>
+        <span class="life-name" id="life-name"></span>
+      </div>
+      <div class="life-desc" id="life-desc"></div>
+    </div>
+    <div class="life-ctrl">
+      <button class="life-btn" id="life-prev" title="上一階段">‹</button>
+      <button class="life-btn play" id="life-play" title="播放/暫停">▶</button>
+      <button class="life-btn" id="life-next" title="下一階段">›</button>
+      <button class="life-btn close" id="life-close" title="關閉">✕</button>
+    </div>
+  </div>
+
   <!-- 操作說明浮層 -->
   <div id="help-overlay" class="overlay hidden">
     <div class="overlay-card">
@@ -101,6 +119,7 @@
         <li><b>近距離觀察</b>：點左側圖鑑或直接點畫面中的昆蟲，相機會飛近做特寫。</li>
         <li><b>構造標註</b>：近看時開啟，標出頭、胸、腹、複眼、翅、足等部位。</li>
         <li><b>昆蟲導覽</b>：自動帶你巡覽每一種昆蟲並解說。</li>
+        <li><b>生命週期 3D 演示</b>：資料卡「生命週期」區按「▶ 3D 演示」，看卵→幼蟲→蛹→成蟲（或若蟲）的立體形態演變。</li>
         <li><b>資料卡</b>：右側顯示真實數據、生命週期（變態）、趣聞。</li>
       </ul>
       <p class="help-foot">純前端 · Three.js · 所有昆蟲與貼圖皆即時程序化生成，無任何圖片檔。</p>
