@@ -85,6 +85,58 @@ export function createHabitat(scene) {
   sky.name = 'sky'; group.add(sky);
   scene.fog = new THREE.Fog(0xd7ead0, 22, 68);
 
+  // ---- 環境昆蟲群(讓畫面熱鬧;純裝飾、不可點選、不進 stations) ----
+  const ambient = (() => {
+    const ag = new THREE.Group(); group.add(ag);
+    const rnd = mulberry(70701);
+    const TINTS = ['#e08a3a', '#6b6bd8', '#e0c040', '#d85050', '#6fae5a', '#5aa0d0', '#eae6dc', '#c060a0'];
+    // 飛舞的小蝴蝶
+    const flyers = [];
+    for (let i = 0; i < 18; i++) {
+      const g2 = new THREE.Group();
+      const col = TINTS[Math.floor(rnd() * TINTS.length)];
+      const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.022, 0.12, 4, 6), new THREE.MeshStandardMaterial({ color: '#2a2320', roughness: 0.6 }));
+      body.rotation.z = Math.PI / 2; g2.add(body);
+      const wmat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.45, metalness: 0.1, side: THREE.DoubleSide, transparent: true, opacity: 0.94 });
+      const wings = [];
+      [-1, 1].forEach((s) => {
+        const geom = new THREE.CircleGeometry(0.12, 14); geom.rotateX(-Math.PI / 2); geom.translate(0, 0, 0.11);
+        const wm = new THREE.Mesh(geom, wmat);
+        const w = new THREE.Group(); w.add(wm); w.scale.z = s; g2.add(w); wings.push({ w, s });
+      });
+      g2.scale.setScalar(0.7 + rnd() * 1.0);
+      ag.add(g2);
+      flyers.push({ g2, wings, hx: (rnd() - 0.5) * 30, hz: (rnd() - 0.5) * 30, r: 2 + rnd() * 5, y: 1.4 + rnd() * 7, sp: 0.3 + rnd() * 0.5, ph: rnd() * 6.28, bob: 0.3 + rnd() * 0.6 });
+    }
+    // 空中飄浮的小蟲塵(Points)
+    const N = 280; const pos = new Float32Array(N * 3); const base = new Float32Array(N * 3);
+    for (let i = 0; i < N; i++) { const x = (rnd() - 0.5) * 46, y = 0.4 + rnd() * 9, z = (rnd() - 0.5) * 46; base[i * 3] = x; base[i * 3 + 1] = y; base[i * 3 + 2] = z; pos.set([x, y, z], i * 3); }
+    const pgeo = new THREE.BufferGeometry(); pgeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+    const pts = new THREE.Points(pgeo, new THREE.PointsMaterial({ color: '#3b3a2c', size: 0.06, sizeAttenuation: true, transparent: true, opacity: 0.5, depthWrite: false }));
+    pts.frustumCulled = false; ag.add(pts);
+    // 地面爬行的小蟲(螞蟻列)
+    const crawlers = [];
+    for (let i = 0; i < 14; i++) {
+      const m = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), new THREE.MeshStandardMaterial({ color: '#20201e', roughness: 0.5 }));
+      m.scale.set(1.9, 0.7, 0.9); ag.add(m);
+      crawlers.push({ m, cx: (rnd() - 0.5) * 26, cz: (rnd() - 0.5) * 26, r: 1.5 + rnd() * 4, sp: 0.4 + rnd() * 0.7, ph: rnd() * 6.28 });
+    }
+    function update(t) {
+      for (let i = 0; i < flyers.length; i++) {
+        const f = flyers[i]; const a = t * f.sp + f.ph;
+        f.g2.position.set(f.hx + Math.cos(a) * f.r + Math.sin(a * 1.7) * 0.5, f.y + Math.sin(a * 2.1) * f.bob, f.hz + Math.sin(a) * f.r * 0.72);
+        f.g2.rotation.y = -a + Math.PI / 2;
+        const flap = Math.sin(t * 8 + i) * 0.95;
+        f.wings.forEach(({ w, s }) => { w.rotation.x = -flap * s; });
+      }
+      const p = pgeo.attributes.position;
+      for (let i = 0; i < N; i++) { p.array[i * 3] = base[i * 3] + Math.sin(t * 0.5 + i * 1.3) * 0.3; p.array[i * 3 + 1] = base[i * 3 + 1] + Math.sin(t * 0.8 + i) * 0.25; }
+      p.needsUpdate = true;
+      for (const c of crawlers) { const a = t * c.sp + c.ph; c.m.position.set(c.cx + Math.cos(a) * c.r, 0.06, c.cz + Math.sin(a) * c.r); c.m.rotation.y = -a; }
+    }
+    return { update };
+  })();
+
   // ---- 擺放昆蟲(依區域,惰性建置) ----
   const stations = new Map();       // id → station(所有已建置的)
   const builtRegions = new Set();
@@ -176,6 +228,7 @@ export function createHabitat(scene) {
   }
 
   function update(t, dt, motionOn) {
+    ambient.update(t);   // 環境昆蟲群(不受區域影響,永遠讓畫面熱鬧)
     for (const st of stations.values()) {
       if (st.region !== activeRegion) continue;
       idle(st, t);
