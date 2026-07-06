@@ -1,0 +1,8 @@
+# OS / 編輯器
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.swp
+.vscode/
+
+# 本專案零依賴、零 build:vendor/ 要進版控(不要 ignore)

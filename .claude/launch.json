@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "insect-world",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["tools/serve.mjs", "8137"],
+      "port": 8137
+    }
+  ]
+}

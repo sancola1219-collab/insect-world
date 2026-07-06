@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>昆蟲世界 · 寫實昆蟲教學模擬器</title>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="stylesheet" href="css/style.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "./vendor/three.module.js",
+      "three/addons/controls/OrbitControls.js": "./vendor/addons/controls/OrbitControls.js"
+    }
+  }
+  </script>
+</head>
+<body>
+  <!-- 3D 畫布容器 -->
+  <div id="scene-root"></div>
+
+  <!-- 載入畫面 -->
+  <div id="loader">
+    <div class="loader-inner">
+      <div class="loader-mark"><span></span><span></span><span></span></div>
+      <div class="loader-title">昆蟲世界</div>
+      <div class="loader-sub">正在孵化生態系…</div>
+    </div>
+  </div>
+
+  <!-- 頂部列 -->
+  <header id="topbar">
+    <div class="brand">
+      <div class="brand-glyph" aria-hidden="true"></div>
+      <div class="brand-text">
+        <div class="brand-title">昆蟲世界</div>
+        <div class="brand-sub">寫實昆蟲教學模擬器</div>
+      </div>
+    </div>
+    <div class="view-indicator" id="view-indicator">
+      <span class="dot"></span><span id="view-label">生態全景</span>
+    </div>
+    <button class="ghost-btn" id="btn-help" title="操作說明">?</button>
+  </header>
+
+  <!-- 左側：昆蟲圖鑑清單 -->
+  <aside id="species-panel" class="panel">
+    <div class="panel-head">
+      <div class="panel-title">昆蟲圖鑑</div>
+      <div class="panel-hint">點選以近距離觀察</div>
+    </div>
+    <div id="species-list" class="species-list"></div>
+    <div class="panel-foot">
+      <button class="wide-btn" id="btn-overview">← 回到生態全景</button>
+    </div>
+  </aside>
+
+  <!-- 右側：資料卡 -->
+  <aside id="info-panel" class="panel hidden">
+    <button class="close-x" id="btn-close-info" title="關閉">×</button>
+    <div id="info-body"></div>
+  </aside>
+
+  <!-- 底部控制列 -->
+  <footer id="controls">
+    <div class="ctrl-group">
+      <span class="ctrl-label">構造標註</span>
+      <button class="toggle" id="btn-anatomy" aria-pressed="false">關</button>
+    </div>
+    <div class="ctrl-group">
+      <span class="ctrl-label">動作</span>
+      <button class="toggle on" id="btn-motion" aria-pressed="true">開</button>
+    </div>
+    <div class="ctrl-group grow">
+      <span class="ctrl-label">尺寸感</span>
+      <div class="scale-readout" id="scale-readout">—</div>
+    </div>
+    <div class="ctrl-group">
+      <button class="wide-btn accent" id="btn-tour">▶ 昆蟲導覽</button>
+    </div>
+  </footer>
+
+  <!-- 導覽提示條 -->
+  <div id="tour-bar" class="hidden">
+    <button class="tour-nav" id="tour-prev">‹</button>
+    <div class="tour-body">
+      <div class="tour-name" id="tour-name"></div>
+      <div class="tour-text" id="tour-text"></div>
+    </div>
+    <button class="tour-nav" id="tour-next">›</button>
+    <button class="tour-exit" id="tour-exit">結束導覽</button>
+  </div>
+
+  <!-- 操作說明浮層 -->
+  <div id="help-overlay" class="overlay hidden">
+    <div class="overlay-card">
+      <button class="close-x" id="btn-close-help">×</button>
+      <h2>怎麼玩</h2>
+      <ul class="help-list">
+        <li><b>生態全景</b>：滑鼠拖曳環顧、滾輪縮放，欣賞草地上活動的昆蟲。</li>
+        <li><b>近距離觀察</b>：點左側圖鑑或直接點畫面中的昆蟲，相機會飛近做特寫。</li>
+        <li><b>構造標註</b>：近看時開啟，標出頭、胸、腹、複眼、翅、足等部位。</li>
+        <li><b>昆蟲導覽</b>：自動帶你巡覽每一種昆蟲並解說。</li>
+        <li><b>資料卡</b>：右側顯示真實數據、生命週期（變態）、趣聞。</li>
+      </ul>
+      <p class="help-foot">純前端 · Three.js · 所有昆蟲與貼圖皆即時程序化生成，無任何圖片檔。</p>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
