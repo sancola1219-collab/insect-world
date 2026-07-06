@@ -134,7 +134,8 @@ state.tourIdx  null 或 0..7(導覽進度)
   ```
   (PowerShell 5.1 管線餵 secret 會壞,一律用 bash——見 [[lesson-ps51-stdin-pipe]]。)
 - 純靜態、無 build 步驟:push 到 main 之後 Pages 直接服務根目錄。
-- **本專案尚未建立遠端 repo / 尚未發佈**(首版在本機完成)。要上線時照上面步驟建 `insect-world` repo。
+- **已發佈**:repo `sancola1219-collab/insect-world`,線上 **https://sancola1219-collab.github.io/insect-world/**(Pages 服務 main 根目錄)。
+- 發佈時踩到的兩點:(1) 帳號是 user 非 org → 建 repo 走 `POST /user/repos`(不是 `/orgs/.../repos`)。(2) 含中文的 repo description 直接放進 bash 的 `-d` 字串會 `400 Problems parsing JSON`(Git Bash 編碼) → 改把 JSON 寫成 UTF-8 檔,用 `--data-binary @file` 送。(3) 首發時 GitHub Pages build 佇列可能異常慢(>15 分才 200),但 config 正確就會上,靜待即可。
 
 ## 6. 路線圖(未完成的擴充方向,依價值排序)
 
