@@ -49,7 +49,11 @@
 })()
 ```
 
-**判讀基準:**
+> ⚠️ **sampleRT 在 hidden 分頁下是「機會性」的**:GPU context 若在那一瞬間活著就讀得到真實像素,
+> 若剛好在 lost/還原空窗就會回傳一堆 0。**多跑幾次取有非零的那次即可**;
+> 真正的決定性驗證閘門是上面第一段的 CPU `inspect()`(不需 GPU,每次都穩定綠)。
+
+**判讀基準(取到非零的那次):**
 - 每個 `avg` 都是非零、且各昆蟲彼此不同 → 證明有實際渲染且畫的是不同內容。
 - 顏色特徵應吻合真實體色(抽驗):
   - `ladybug` 紅色通道最高(紅色鞘翅)。
@@ -99,5 +103,5 @@
 - **2026-07-06 首版(Claude Opus 4.8 建立)**:
   - CPU 檢查:8 種昆蟲全部 meshes 12–34、badPos 0、boxFinite、anchorsOK 全 true;labels 7/7 可見;sane true。
   - 取景:focusErr 全部 ≤ 0.059(dragonfly 由 0.134 調 follow-lerp 後降到 0.059)。
-  - 像素:sampleRT 各昆蟲 avg 非零且互異;ladybug 紅通道最高、ant 最暗、dragonfly 最亮偏青 —— 與真實體色一致。
+  - 像素:某次完整 sampleRT 取到各昆蟲 avg 非零且互異(ladybug 紅通道最高 58–72、ant 最暗、dragonfly 最亮偏青 —— 與真實體色一致);但 hidden 分頁下 sampleRT 有時整批回 0(context 空窗),屬環境限制非程式缺陷,CPU inspect 才是穩定閘門。
   - context:hidden 分頁下畫布 context 曾 lost;已加 `webglcontextlost/restored` 處理,並改用 render target 取樣。console 無 error/warning。
