@@ -20,6 +20,10 @@ const LAYOUT = {
   ant:        { home: [1.5, 0.12, 5.5], type: 'walk', yaw: 0 },
   grasshopper:{ home: [6, 0.5, -4],  type: 'perch',  yaw: -1.6 },
   beetle:     { home: [-7, 1.6, 4],  type: 'tree',   yaw: 1.9 },
+  cicada:     { home: [-8.2, 3.4, 2.2], type: 'tree', yaw: 2.2 },
+  stagbeetle: { home: [8, 0.7, 1.5],  type: 'perch',  yaw: -2.3 },
+  stickinsect:{ home: [-3.5, 1.3, -5.5], type: 'perch', yaw: 0.9 },
+  firefly:    { home: [2.5, 2.4, -5.5], type: 'flit',  yaw: -0.5 },
 };
 
 export function createHabitat(scene) {

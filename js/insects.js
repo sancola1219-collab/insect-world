@@ -416,7 +416,166 @@ function grasshopper() {
   return { group, anchors, animate, baseLength: 1.2 };
 }
 
-const BUILDERS = { butterfly, beetle, bee, dragonfly, ladybug, mantis, ant, grasshopper };
+function cicada() {
+  const group = new THREE.Group();
+  const anchors = {};
+  const body = chitinMat('#3c4850', 0.45, { metalness: 0.2, clearcoat: 0.5 });
+  const dark = chitinMat('#20282d', 0.5);
+  // 寬胸 + 錐形腹(中空共鳴)
+  const thorax = segment(0.16, 0.15, 0.18, body); thorax.position.set(0.05, 0.02, 0); group.add(thorax);
+  const abd = segment(0.13, 0.12, 0.26, dark); abd.position.set(-0.28, -0.01, 0); abd.rotation.y = Math.PI / 2; group.add(abd);
+  // 節紋
+  for (let i = 0; i < 4; i++) { const ring = new THREE.Mesh(new THREE.TorusGeometry(0.12 - i * 0.015, 0.008, 6, 20), body); ring.position.set(-0.2 - i * 0.11, -0.01, 0); ring.rotation.y = Math.PI / 2; group.add(ring); }
+  // 寬頭 + 兩側大複眼
+  const head = segment(0.13, 0.1, 0.16, body); head.position.set(0.25, 0.0, 0); group.add(head);
+  const eye = eyeMat('#20161a');
+  [-1, 1].forEach((s) => { const e = segment(0.055, 0.06, 0.055, eye); e.position.set(0.27, 0.02, s * 0.16); group.add(e); });
+  // 刺吸口器(向下針狀)
+  const prob = tube([[0.26, -0.08, 0], [0.24, -0.22, 0], [0.22, -0.34, 0]], 0.02, 0.006, dark); group.add(prob);
+  // 短觸角
+  [-1, 1].forEach((s) => { const a = tube([[0.3, 0.02, s * 0.05], [0.36, 0.04, s * 0.07]], 0.008, 0.004, dark); group.add(a); });
+  // 兩對透明膜翅(屋頂狀覆背)
+  const wmat = new THREE.MeshPhysicalMaterial({ map: TX.wingMembrane('net', '#dfeaf0'), transparent: true, opacity: 0.42, side: THREE.DoubleSide, roughness: 0.2, metalness: 0.1, iridescence: 0.6, transmission: 0.3 });
+  const wings = [];
+  [-1, 1].forEach((s) => {
+    const fore = new THREE.Group(); const fw = wingMesh(0.62, 0.2, wmat); fore.add(fw);
+    fore.position.set(0.06, 0.12, s * 0.06); fore.rotation.x = s * 0.55; fore.scale.z = s; group.add(fore);
+    const hind = new THREE.Group(); const hw = wingMesh(0.4, 0.16, wmat); hind.add(hw);
+    hind.position.set(-0.06, 0.1, s * 0.05); hind.rotation.x = s * 0.5; hind.scale.z = s; group.add(hind);
+    wings.push({ fore, hind, s });
+  });
+  const legs = addLegs(group, 0.06, 0.14, 0.24, 0.02, dark, { droop: 0.7, spanZ: 0.16 });
+  anchor(group, anchors, 'head', 0.28, 0.14, 0);
+  anchor(group, anchors, 'eye', 0.29, 0.04, 0.2);
+  anchor(group, anchors, 'proboscis', 0.22, -0.34, 0);
+  anchor(group, anchors, 'thorax', 0.05, 0.2, 0);
+  anchor(group, anchors, 'wing', 0.05, 0.2, 0.4);
+  anchor(group, anchors, 'tymbal', -0.16, 0.02, 0.14);
+  anchor(group, anchors, 'abdomen', -0.4, -0.02, 0);
+  anchor(group, anchors, 'leg', 0.06, -0.18, 0.16);
+  const animate = (t, moving) => {
+    const buzz = moving ? Math.sin(t * 30) * 0.02 : 0; // 鳴叫時腹部微振
+    wings.forEach(({ fore, hind, s }) => { const f = moving ? Math.sin(t * 5) * 0.05 : 0; fore.rotation.x = s * (0.55 + f); hind.rotation.x = s * (0.5 + f); });
+    group.position.y = buzz;
+  };
+  return { group, anchors, animate, baseLength: 1.1 };
+}
+
+function stagbeetle() {
+  const group = new THREE.Group();
+  const anchors = {};
+  const shell = chitinMat('#241c14', 0.28, { metalness: 0.4, clearcoat: 0.85, clearcoatRoughness: 0.2 });
+  const dark = chitinMat('#140f0a', 0.4);
+  // 鞘翅(較扁長的半橢球)
+  const elytra = segment(0.44, 0.22, 0.32, shell); elytra.position.set(-0.12, 0.06, 0); group.add(elytra);
+  const seam = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.02, 0.01), dark); seam.position.set(-0.12, 0.28, 0); group.add(seam);
+  // 前胸背板
+  const pron = segment(0.2, 0.1, 0.26, shell); pron.position.set(0.24, 0.05, 0); group.add(pron);
+  // 寬扁頭
+  const head = segment(0.12, 0.08, 0.18, dark); head.position.set(0.42, 0.03, 0); group.add(head);
+  // 大顎(如鹿角,分叉、內側帶齒)
+  const mand = [];
+  [-1, 1].forEach((s) => {
+    const base = tube([[0.5, 0.03, s * 0.1], [0.66, 0.06, s * 0.16], [0.82, 0.12, s * 0.12]], 0.035, 0.02, dark); group.add(base);
+    const tip = tube([[0.82, 0.12, s * 0.12], [0.92, 0.2, s * 0.08], [0.98, 0.16, s * 0.04]], 0.02, 0.01, dark); group.add(tip);
+    // 內齒
+    const tooth = new THREE.Mesh(new THREE.ConeGeometry(0.02, 0.06, 6), dark); tooth.position.set(0.72, 0.06, s * 0.09); tooth.rotation.z = s * 1.2; group.add(tooth);
+    mand.push({ s });
+  });
+  [-1, 1].forEach((s) => { const e = segment(0.03, 0.035, 0.03, eyeMat('#0a0806')); e.position.set(0.44, 0.06, s * 0.14); group.add(e); });
+  const legs = addLegs(group, 0.1, 0.24, 0.32, 0.028, dark, { droop: 0.55, spanZ: 0.3 });
+  anchor(group, anchors, 'mandible', 0.92, 0.24, 0.1);
+  anchor(group, anchors, 'head', 0.44, -0.06, 0);
+  anchor(group, anchors, 'thorax', 0.24, 0.18, 0);
+  anchor(group, anchors, 'elytra', -0.22, 0.3, 0);
+  anchor(group, anchors, 'leg', 0.1, -0.18, 0.32);
+  anchor(group, anchors, 'abdomen', -0.42, 0.04, 0);
+  const animate = (t, moving) => {
+    const w = moving ? 0.22 : 0;
+    legs.forEach(({ p, side, phase }) => { p.rotation.z = Math.sin(t * 5 + phase * 2 + (side > 0 ? Math.PI : 0)) * w; });
+  };
+  return { group, anchors, animate, baseLength: 1.4 };
+}
+
+function stickinsect() {
+  const group = new THREE.Group();
+  const anchors = {};
+  const body = chitinMat('#6d7a44', 0.7, { metalness: 0.02 });
+  // 極細長身體(多節)
+  for (let i = 0; i < 10; i++) {
+    const r = 0.035 - Math.abs(i - 4) * 0.002;
+    const seg = segment(r, r, 0.11, body); seg.position.set(0.45 - i * 0.12, 0, 0); seg.rotation.y = Math.PI / 2; group.add(seg);
+    if (i % 3 === 0) { const knob = new THREE.Mesh(new THREE.SphereGeometry(r * 1.3, 8, 6), body); knob.position.set(0.45 - i * 0.12 + 0.05, 0, 0); group.add(knob); }
+  }
+  // 小頭 + 長觸角
+  const head = segment(0.04, 0.045, 0.06, body); head.position.set(0.55, 0.0, 0); group.add(head);
+  [-1, 1].forEach((s) => { const e = segment(0.015, 0.018, 0.015, eyeMat('#20240e')); e.position.set(0.57, 0.02, s * 0.03); group.add(e); });
+  [-1, 1].forEach((s) => { const a = tube([[0.58, 0.01, s * 0.02], [0.72, 0.02, s * 0.04], [0.86, 0.0, s * 0.05]], 0.006, 0.003, body); group.add(a); });
+  // 六條極細長腳
+  const legs = [];
+  [0.36, 0.1, -0.16].forEach((x, idx) => {
+    [-1, 1].forEach((s) => {
+      const p = new THREE.Group(); p.position.set(x, 0, s * 0.03);
+      const spanX = idx === 0 ? 0.3 : (idx === 2 ? -0.35 : 0.05);
+      const leg = tube([[0, 0, 0], [spanX * 0.5, -0.02, s * 0.28], [spanX, -0.18, s * 0.4], [spanX * 1.05, -0.34, s * 0.42]], 0.012, 0.005, body);
+      p.add(leg); group.add(p); legs.push({ p, side: s, phase: idx });
+    });
+  });
+  anchor(group, anchors, 'head', 0.56, 0.1, 0);
+  anchor(group, anchors, 'antenna', 0.86, 0.04, 0.05);
+  anchor(group, anchors, 'thorax', 0.28, 0.08, 0);
+  anchor(group, anchors, 'abdomen', -0.5, 0.06, 0);
+  anchor(group, anchors, 'leg', 0.36, -0.28, 0.4);
+  const animate = (t, moving) => {
+    const sway = Math.sin(t * 0.8) * (moving ? 0.06 : 0.02); // 隨風擺動的擬態
+    group.rotation.z = sway * 0.15;
+    legs.forEach(({ p, side, phase }) => { p.rotation.x = Math.sin(t * 2 + phase + (side > 0 ? Math.PI : 0)) * (moving ? 0.05 : 0.01); });
+  };
+  return { group, anchors, animate, baseLength: 1.6 };
+}
+
+function firefly() {
+  const group = new THREE.Group();
+  const anchors = {};
+  const soft = chitinMat('#241c10', 0.6, { metalness: 0.05, clearcoat: 0.3 });
+  const orange = new THREE.MeshStandardMaterial({ color: '#d8722a', roughness: 0.5 });
+  // 鞘翅(柔軟黑翅)
+  const elytra = segment(0.24, 0.1, 0.16, soft); elytra.position.set(-0.06, 0.05, 0); group.add(elytra);
+  const seam = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.012, 0.008), soft); seam.position.set(-0.06, 0.14, 0); group.add(seam);
+  // 前胸背板(橙色帽簷,罩住頭)
+  const pron = new THREE.Mesh(new THREE.SphereGeometry(0.12, 18, 14, 0, Math.PI * 2, 0, Math.PI / 2), orange);
+  pron.scale.set(1, 0.55, 1.15); pron.position.set(0.16, 0.04, 0); group.add(pron);
+  // 頭(藏於帽簷下) + 大複眼
+  const head = segment(0.06, 0.06, 0.07, soft); head.position.set(0.24, 0.0, 0); group.add(head);
+  [-1, 1].forEach((s) => { const e = segment(0.04, 0.045, 0.035, eyeMat('#0b0b0b')); e.position.set(0.25, 0.0, s * 0.06); group.add(e); });
+  [-1, 1].forEach((s) => { const a = tube([[0.27, 0.02, s * 0.03], [0.33, 0.06, s * 0.05], [0.38, 0.05, s * 0.07]], 0.007, 0.004, soft); group.add(a); });
+  // 發光器(腹端,emissive + 點光源)
+  const glowMat = new THREE.MeshStandardMaterial({ color: '#eaffa0', emissive: new THREE.Color('#c9ff3a'), emissiveIntensity: 2.2, roughness: 0.4 });
+  const lightOrgan = segment(0.09, 0.06, 0.12, glowMat); lightOrgan.position.set(-0.26, -0.02, 0); group.add(lightOrgan);
+  const glow = new THREE.PointLight(0xbfff5a, 0, 3, 2); glow.position.set(-0.3, 0, 0); group.add(glow);
+  // 後翅(飛行用,半透明)
+  const wmat = new THREE.MeshPhysicalMaterial({ map: TX.wingMembrane('bee', '#e8f0c0'), transparent: true, opacity: 0.4, side: THREE.DoubleSide, roughness: 0.3, iridescence: 0.3 });
+  const wings = [];
+  [-1, 1].forEach((s) => { const wg = new THREE.Group(); const w = wingMesh(0.34, 0.14, wmat); wg.add(w); wg.position.set(-0.02, 0.06, s * 0.04); wg.scale.z = s; group.add(wg); wings.push({ wg, s }); });
+  const legs = addLegs(group, 0.02, 0.1, 0.14, 0.012, soft, { droop: 0.7, spanZ: 0.1 });
+  anchor(group, anchors, 'lightorgan', -0.3, -0.06, 0);
+  anchor(group, anchors, 'head', 0.26, 0.06, 0.08);
+  anchor(group, anchors, 'pronotum', 0.16, 0.14, 0);
+  anchor(group, anchors, 'elytra', -0.06, 0.16, 0);
+  anchor(group, anchors, 'abdomen', -0.22, -0.06, 0);
+  anchor(group, anchors, 'leg', 0.02, -0.14, 0.1);
+  const animate = (t, moving) => {
+    // 一閃一閃的冷光(即使停動作也緩慢呼吸)
+    const pulse = Math.max(0, Math.sin(t * (moving ? 3.2 : 1.4)));
+    const glowOn = pulse * pulse;
+    glowMat.emissiveIntensity = 0.6 + glowOn * 3.2;
+    glow.intensity = glowOn * 2.4;
+    if (moving) { wings.forEach(({ wg, s }) => { wg.rotation.x = -Math.sin(t * 34) * 0.5 * s; }); group.position.y = Math.sin(t * 5) * 0.03; }
+  };
+  return { group, anchors, animate, baseLength: 0.75 };
+}
+
+const BUILDERS = { butterfly, beetle, bee, dragonfly, ladybug, mantis, ant, grasshopper, cicada, stagbeetle, stickinsect, firefly };
 
 // 建構並回傳(套用陰影旗標)
 export function buildInsect(kind) {

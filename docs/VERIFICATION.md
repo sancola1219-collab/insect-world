@@ -105,3 +105,9 @@
   - 取景:focusErr 全部 ≤ 0.059(dragonfly 由 0.134 調 follow-lerp 後降到 0.059)。
   - 像素:某次完整 sampleRT 取到各昆蟲 avg 非零且互異(ladybug 紅通道最高 58–72、ant 最暗、dragonfly 最亮偏青 —— 與真實體色一致);但 hidden 分頁下 sampleRT 有時整批回 0(context 空窗),屬環境限制非程式缺陷,CPU inspect 才是穩定閘門。
   - context:hidden 分頁下畫布 context 曾 lost;已加 `webglcontextlost/restored` 處理,並改用 render target 取樣。console 無 error/warning。
+
+- **2026-07-06 擴充至 12 種(Claude Opus 4.8)**:新增台灣熊蟬、台灣扁鍬形蟲、台灣皮竹節蟲、黑翅螢。
+  - CPU 檢查:12 種全部 meshes 12–34、badPos 0、boxFinite、anchorsOK 全 true(新昆蟲的 anatomy part key 都對得上 builder anchor);sane true;console 無 error。
+  - 取景:新四種 focusErr ≤ 0.05(cicada 0.006、stagbeetle 0.001、stickinsect 0、firefly 0.05);標註 firefly 6/6、stagbeetle 6/6 可見。
+  - 導覽:12 站依分類故事順序走完並正確 wrap 回蝴蝶。
+  - 像素:本次驗證時 hidden 分頁 context 持續 lost(`ext WEBGL_lose_context` 不可用、無法強制還原),故 sampleRT 全 0——**屬環境限制**;新四種沿用與已驗證 8 種相同的材質/幾何 helper,渲染路徑一致。決定性閘門 CPU inspect 全綠。
