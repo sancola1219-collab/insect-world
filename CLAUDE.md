@@ -1,6 +1,6 @@
 # 昆蟲世界(Insect World)
 
-寫實昆蟲教學模擬器:生態全景 ↔ 昆蟲特寫,十二種台灣常見昆蟲(橫跨八大類群)。純前端(Three.js r160 已 vendor,零 npm 零圖檔),繁體中文教學介面。
+寫實昆蟲教學模擬器:生態全景 ↔ 昆蟲特寫,可切換 9 大世界區域(台灣 12 種 + 世界 32 種 = 44 種)。純前端(Three.js r160 已 vendor,零 npm 零圖檔),繁體中文教學介面。
 
 **接手必讀:[docs/HANDOFF.md](docs/HANDOFF.md)** — 完整架構、測試方法、已踩的坑、發佈流程都在那裡。
 
@@ -18,4 +18,8 @@ node tools/serve.mjs 8137   →  http://localhost:8137/
 
 ## 加一種昆蟲
 
-`data.js` 加一筆(含 `builder` 名、`anatomy` 的 part key)+ `LIFE` 加一筆(變態型態)→ `insects.js` 寫對應 builder(回傳 `{group, anchors, animate, baseLength}`,anchor key 要對得上 anatomy;翅膀用 `wingMesh` 才會被標 `isWing`)→ `habitat.js` 的 `LAYOUT` 給牠一個家與棲息型態。用 `__IW.inspect().anchorsOK` 確認標註對得上、`__IW.lifecycle()` 確認四階段正常。
+- **加台灣原生種**:`data.js` 的 `INSECTS` 加一筆(新 `builder` 要在 `insects.js` 寫、`LIFE` 補一筆;`anatomy` part key 對得上 anchor)→ `habitat.js` 的 `LAYOUT` 給家。
+- **加世界物種(最常見)**:`data.js` 的 `WORLD` 用 `mk(...)` 加一筆——沿用既有 `builder`、給 `region` 與 `tint`(體色),構造/變態自動套 `A`/`M` 模板;不必改模型與 habitat(通用擺放槽 `slotFor`)。
+- **加區域**:`data.js` 的 `REGIONS` 加一筆,對應 `WORLD` 裡該 `region` 的物種即可。
+
+驗證:`__IW.switchRegion(id)` 後 `inspect().anchorsOK` 對得上、`bodyColor()` 確認 tint 生效、`lifecycle()` 四階段正常。

@@ -11,10 +11,11 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createHabitat } from './habitat.js';
 import { createUI } from './ui.js';
 import { buildStages } from './lifecycle.js';
-import { INSECTS, byId, TOUR_ORDER, OVERVIEW_INTRO, LIFE } from './data.js';
+import { INSECTS, byId, OVERVIEW_INTRO, REGIONS, regionInsects, tourForRegion, regionById, lifeOf } from './data.js';
 
 const state = {
   view: 'habitat',   // 'habitat' | 'focus'
+  region: 'taiwan',  // 目前區域
   focus: null,       // 昆蟲 id
   anatomy: false,
   motion: true,
@@ -22,6 +23,7 @@ const state = {
   lifeStage: null,   // null 或 0..3(變態階段)
   lifePlaying: false,
 };
+const currentTour = () => tourForRegion(state.region);
 const LIFE_INTERVAL = 2.6;   // 自動播放每階段秒數
 let lifeTimer = 0;
 
@@ -81,6 +83,7 @@ function init() {
     onLifeGoto: (i) => gotoLifeStage(i),
     onLifeToggle: () => setLifePlaying(!state.lifePlaying),
     onLifeClose: () => closeLifecycle(true),
+    onRegion: (id) => switchRegion(id),
   });
 
   // 讓載入畫面先繪出,再做重活(建構所有昆蟲與程序化貼圖)
@@ -93,6 +96,8 @@ function build() {
   window.addEventListener('resize', onResize);
   if ('ResizeObserver' in window) new ResizeObserver(onResize).observe(document.getElementById('scene-root'));
 
+  ui.setSpeciesList(regionInsects(state.region));
+  ui.setActiveRegion(state.region);
   goOverview(false);
   ui.setMotion(state.motion);
   ui.setAnatomy(state.anatomy);
@@ -160,19 +165,33 @@ function startTour() { state.tourIdx = 0; applyTour(); }
 function stopTour() { state.tourIdx = null; ui.hideTour(); }
 function tourNav(d) {
   if (state.tourIdx === null) return;
-  state.tourIdx = (state.tourIdx + d + TOUR_ORDER.length) % TOUR_ORDER.length;
+  const tour = currentTour();
+  state.tourIdx = (state.tourIdx + d + tour.length) % tour.length;
   applyTour();
 }
 function applyTour() {
-  const id = TOUR_ORDER[state.tourIdx];
+  const tour = currentTour();
+  const id = tour[state.tourIdx];
   focusSpecies(id, true);
-  ui.showTour(byId(id), state.tourIdx, TOUR_ORDER.length);
+  ui.showTour(byId(id), state.tourIdx, tour.length);
+}
+
+// ---------- 區域切換 ----------
+function switchRegion(id) {
+  if (!regionById(id) || id === state.region) { if (id === state.region) return; }
+  stopTour();
+  if (state.lifeStage !== null) closeLifecycle(false);
+  state.region = id;
+  habitat.setRegion(id);
+  ui.setSpeciesList(regionInsects(id));
+  ui.setActiveRegion(id);
+  goOverview(false);     // 切區後回全景重新取景
 }
 
 // ---------- 生命週期(變態)播放器 ----------
 function ensureStages(st, sp) {
   if (st.life) return st.life;
-  const stages = buildStages(sp, st.insect, LIFE[sp.id]);   // [卵,幼/若,蛹/若,{adult}]
+  const stages = buildStages(sp, st.insect, lifeOf(sp));   // [卵,幼/若,蛹/若,{adult}]
   const s = st.inner.scale.x;                               // 站點真實比例
   const radii = stages.map((e) => (e.adult ? st.radius : e.baseLength * s));
   stages.forEach((e) => { if (e.group) { e.group.visible = false; e.group.traverse((o) => { if (o.isMesh) o.castShadow = true; }); st.inner.add(e.group); } });
@@ -301,8 +320,6 @@ function updateLabels() {
 
 // ---------- 互動:點選拾取 ----------
 function wireInput() {
-  // 標記每個 pivot 的所有子物件,讓 raycast 命中後能反查是哪一種昆蟲
-  habitat.stations.forEach((st) => { st.pivot.traverse((o) => (o.userData.stationId = st.id)); });
   const dom = renderer.domElement;
   const ray = new THREE.Raycaster();
   const ptr = new THREE.Vector2();
@@ -320,7 +337,7 @@ function wireInput() {
   });
 }
 function pick(ray) {
-  const pivots = [...habitat.stations.values()].map((s) => s.pivot);
+  const pivots = habitat.activeStations().map((s) => s.pivot); // 只在目前區域內拾取
   const hits = ray.intersectObjects(pivots, true);
   if (!hits.length) return null;
   let o = hits[0].object;
@@ -348,8 +365,9 @@ function realLen(sp) {
 // ---------- 測試 API(hidden browser 下的驗證入口) ----------
 function exposeTestAPI() {
   window.__IW = {
-    state: () => JSON.parse(JSON.stringify({ view: state.view, focus: state.focus, anatomy: state.anatomy, motion: state.motion, tourIdx: state.tourIdx, lifeStage: state.lifeStage, lifePlaying: state.lifePlaying, simT })),
-    species: () => INSECTS.map((s) => s.id),
+    state: () => JSON.parse(JSON.stringify({ view: state.view, region: state.region, focus: state.focus, anatomy: state.anatomy, motion: state.motion, tourIdx: state.tourIdx, lifeStage: state.lifeStage, lifePlaying: state.lifePlaying, simT })),
+    species: () => regionInsects(state.region).map((s) => s.id),   // 目前區域的昆蟲
+    allSpecies: () => INSECTS.map((s) => s.id),
     forceSize(w, h) { renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); return [w, h]; },
     step(ms = 16) { tick(ms / 1000); return simT; },
     settle(frames = 90, ms = 16) { for (let i = 0; i < frames; i++) tick(ms / 1000); return simT; },
@@ -359,6 +377,9 @@ function exposeTestAPI() {
     setMotion(on) { setMotion(!!on); return state.motion; },
     tour() { startTour(); return state.tourIdx; },
     tourNav(d) { tourNav(d); return state.tourIdx; },
+    regions() { return REGIONS.map((r) => r.id); },
+    region() { return state.region; },
+    switchRegion(id) { switchRegion(id); return state.region; },
     openLifecycle() { openLifecycle(); return state.lifeStage; },
     setLifeStage(i) { gotoLifeStage(i); return state.lifeStage; },
     closeLifecycle() { closeLifecycle(true); return state.lifeStage; },
@@ -367,7 +388,7 @@ function exposeTestAPI() {
       if (!state.focus) return { error: 'not focused' };
       const sp = byId(state.focus); const st = habitat.stations.get(state.focus);
       openLifecycle();
-      const kind = LIFE[sp.id].kind;
+      const kind = lifeOf(sp).kind;
       const stages = [];
       for (let i = 0; i < 4; i++) {
         gotoLifeStage(i);
@@ -411,6 +432,22 @@ function exposeTestAPI() {
     labelCount() { return document.querySelectorAll('#label-layer .anno').length; },
     visibleLabels() { return [...document.querySelectorAll('#label-layer .anno')].filter((n) => n.style.opacity === '1').length; },
     contextLost: () => contextLost,
+    // 目前聚焦昆蟲最主要的身體材質顏色(驗證區域染色 tint 是否生效,免 GPU)
+    bodyColor() {
+      if (!state.focus) return null;
+      const st = habitat.stations.get(state.focus);
+      const counts = new Map();
+      st.insect.group.traverse((o) => {
+        const m = o.isMesh && o.material;
+        if (m && m.color && !(m.userData && m.userData.noTint)) {
+          const k = '#' + m.color.getHexString();
+          counts.set(k, (counts.get(k) || 0) + 1);
+        }
+      });
+      let best = null, bc = 0;
+      counts.forEach((v, k) => { if (v > bc) { bc = v; best = k; } });
+      return best;
+    },
     // 分層射線檢查(GPU 無關):從目前相機朝畫面上/中/下三點打射線,回報各自命中什麼。
     // 用來抓「單一物件蓋滿全畫面」的錯誤(例如天球內面外翻)——正常全景應是 上=sky、下=ground。
     strata() {
@@ -455,7 +492,7 @@ function exposeTestAPI() {
     inspect() {
       const box = new THREE.Box3();
       const rep = {};
-      habitat.stations.forEach((st) => {
+      habitat.activeStations().forEach((st) => {   // 只檢查目前區域(已建置)
         let meshes = 0, badPos = 0;
         st.pivot.traverse((o) => { if (o.isMesh) { meshes++; if (!Number.isFinite(o.position.x)) badPos++; } });
         box.setFromObject(st.pivot);

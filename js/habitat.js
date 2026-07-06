@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import * as TX from './textures.js';
 import { buildInsect } from './insects.js';
-import { INSECTS, byId } from './data.js';
+import { INSECTS, byId, regionInsects } from './data.js';
 
 // 真實相對大小:世界長度 = lengthMM * MM,再除以模型 baseLength 得縮放
 const MM = 0.03;
@@ -85,28 +85,68 @@ export function createHabitat(scene) {
   sky.name = 'sky'; group.add(sky);
   scene.fog = new THREE.Fog(0xd7ead0, 22, 68);
 
-  // ---- 擺放昆蟲 ----
-  const stations = new Map();
-  for (const sp of INSECTS) {
-    const built = buildInsect(sp.builder);
+  // ---- 擺放昆蟲(依區域,惰性建置) ----
+  const stations = new Map();       // id → station(所有已建置的)
+  const builtRegions = new Set();
+  let activeRegion = 'taiwan';
+
+  // 非台灣區用通用擺放槽:依身體模型決定棲息型態與高度,扇形分佈
+  const TYPE_BY_BUILDER = {
+    butterfly: 'flit', firefly: 'flit', dragonfly: 'dart', bee: 'hover',
+    cicada: 'tree', beetle: 'perch', stagbeetle: 'perch', mantis: 'perch',
+    grasshopper: 'perch', stickinsect: 'perch', ant: 'walk', ladybug: 'crawl',
+  };
+  function slotFor(sp, i, n) {
+    const ang = (n <= 1 ? 0 : (i / (n - 1) - 0.5)) * 1.7;
+    const r = 5.6;
+    const type = TYPE_BY_BUILDER[sp.builder] || 'perch';
+    const air = type === 'flit' || type === 'dart' || type === 'hover' || type === 'tree';
+    const y = type === 'walk' ? 0.12 : type === 'crawl' ? 1.0 : air ? (2.6 + (i % 2) * 0.9) : 0.7;
+    return { home: [Math.sin(ang) * r, y, Math.cos(ang) * r - 0.5], type, yaw: -ang };
+  }
+
+  function buildStation(sp, place) {
+    if (stations.has(sp.id)) return stations.get(sp.id);
+    const built = buildInsect(sp.builder, { tint: sp.tint });
     const scale = (sp.lengthMM * MM) / built.baseLength;
     const pivot = new THREE.Group();
-    const L = LAYOUT[sp.id];
-    pivot.position.set(...L.home);
-    pivot.rotation.y = L.yaw;
+    pivot.position.set(...place.home);
+    pivot.rotation.y = place.yaw;
     const inner = new THREE.Group();      // 承載縮放與待機位移,pivot 只管家座標
     inner.scale.setScalar(scale);
     inner.add(built.group);
     pivot.add(inner);
+    pivot.visible = false;
     group.add(pivot);
+    pivot.traverse((o) => (o.userData.stationId = sp.id)); // 供 raycast 反查(含 pivot 本身)
     const radius = built.baseLength * scale; // 取景用半徑
-    stations.set(sp.id, {
-      id: sp.id, pivot, inner, insect: built, home: new THREE.Vector3(...L.home),
-      layout: L, radius, focused: false,
+    const st = {
+      id: sp.id, region: sp.region, pivot, inner, insect: built, home: new THREE.Vector3(...place.home),
+      layout: place, radius, focused: false, life: null,
       worldPos: () => pivot.getWorldPosition(new THREE.Vector3()),
       anchorWorld: (key) => { const a = built.anchors[key]; return a ? a.getWorldPosition(new THREE.Vector3()) : null; },
-    });
+    };
+    stations.set(sp.id, st);
+    return st;
   }
+
+  function ensureRegion(rid) {
+    if (builtRegions.has(rid)) return;
+    const list = regionInsects(rid);
+    list.forEach((sp, i) => {
+      const place = (rid === 'taiwan' && LAYOUT[sp.id]) ? LAYOUT[sp.id] : slotFor(sp, i, list.length);
+      buildStation(sp, place);
+    });
+    builtRegions.add(rid);
+  }
+
+  function setRegion(rid) {
+    ensureRegion(rid);
+    activeRegion = rid;
+    for (const st of stations.values()) st.pivot.visible = (st.region === rid);
+    return regionInsects(rid);
+  }
+  function activeStations() { return [...stations.values()].filter((s) => s.region === activeRegion); }
 
   // 待機漫遊:依 type 給不同路徑;focused 時 damp→0 收斂到家
   function idle(st, t) {
@@ -137,13 +177,20 @@ export function createHabitat(scene) {
 
   function update(t, dt, motionOn) {
     for (const st of stations.values()) {
+      if (st.region !== activeRegion) continue;
       idle(st, t);
       st.insect.animate(t, motionOn);
     }
   }
 
+  setRegion('taiwan');   // 預設區域
+
   const overviewFrame = { center: new THREE.Vector3(0, 2.2, 0), distance: 20, height: 8 };
-  return { group, stations, update, overviewFrame };
+  return {
+    group, stations, update, overviewFrame,
+    setRegion, activeStations,
+    getRegion: () => activeRegion,
+  };
 }
 
 // 確定性亂數(免用 Math.random,方便重現)

@@ -13,7 +13,7 @@ const chitinMat = (base, rough = 0.5, opts = {}) => {
   return new THREE.MeshPhysicalMaterial({ map, roughnessMap: rmap, roughness: 1, metalness: 0.15, clearcoat: 0.3, clearcoatRoughness: 0.5, ...opts });
 };
 const glossMat = (color, opts = {}) => new THREE.MeshPhysicalMaterial({ color, roughness: 0.28, metalness: 0.1, clearcoat: 0.7, clearcoatRoughness: 0.2, ...opts });
-const eyeMat = (base = '#20303a') => new THREE.MeshStandardMaterial({ map: TX.compoundEye(base), roughness: 0.25, metalness: 0.1, emissive: new THREE.Color(base).multiplyScalar(0.15) });
+const eyeMat = (base = '#20303a') => { const m = new THREE.MeshStandardMaterial({ map: TX.compoundEye(base), roughness: 0.25, metalness: 0.1, emissive: new THREE.Color(base).multiplyScalar(0.15) }); m.userData.noTint = true; return m; };
 
 // 以 SphereGeometry 拉伸成體節
 function segment(rx, ry, rz, mat, seg = 20) {
@@ -552,6 +552,7 @@ function firefly() {
   [-1, 1].forEach((s) => { const a = tube([[0.27, 0.02, s * 0.03], [0.33, 0.06, s * 0.05], [0.38, 0.05, s * 0.07]], 0.007, 0.004, soft); group.add(a); });
   // 發光器(腹端,emissive + 點光源)
   const glowMat = new THREE.MeshStandardMaterial({ color: '#eaffa0', emissive: new THREE.Color('#c9ff3a'), emissiveIntensity: 2.2, roughness: 0.4 });
+  glowMat.userData.noTint = true;
   const lightOrgan = segment(0.09, 0.06, 0.12, glowMat); lightOrgan.position.set(-0.26, -0.02, 0); group.add(lightOrgan);
   const glow = new THREE.PointLight(0xbfff5a, 0, 3, 2); glow.position.set(-0.3, 0, 0); group.add(glow);
   // 後翅(飛行用,半透明)
@@ -578,9 +579,24 @@ function firefly() {
 
 const BUILDERS = { butterfly, beetle, bee, dragonfly, ladybug, mantis, ant, grasshopper, cicada, stagbeetle, stickinsect, firefly };
 
-// 建構並回傳(套用陰影旗標)
-export function buildInsect(kind) {
+// 依區域體色染色:有貼圖的材質乘上 tint(保留紋理),純色材質向 tint 內插;跳過複眼/發光器
+function applyTint(group, tint) {
+  if (!tint) return;
+  const c = new THREE.Color(tint);
+  const seen = new Set();  // 材質常被多個 mesh 共用,每個材質只染一次
+  group.traverse((o) => {
+    if (!o.isMesh) return;
+    const m = o.material;
+    if (!m || !m.color || (m.userData && m.userData.noTint) || seen.has(m)) return;
+    seen.add(m);
+    if (m.map) m.color.multiply(c); else m.color.lerp(c, 0.7);
+  });
+}
+
+// 建構並回傳(套用陰影旗標;opts.tint 依區域物種染色)
+export function buildInsect(kind, opts = {}) {
   const b = (BUILDERS[kind] || butterfly)();
+  if (opts.tint) applyTint(b.group, opts.tint);
   b.group.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } });
   b.group.userData.kind = kind;
   return b;

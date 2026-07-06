@@ -125,6 +125,28 @@
 
 ---
 
+## 世界區域快速驗證
+
+```js
+(() => {
+  const IW = window.__IW; IW.forceSize(1200,760);
+  const problems = [], summary = {};
+  for (const rid of IW.regions()) {
+    IW.switchRegion(rid); IW.settle(8);
+    const insp = IW.inspect(); summary[rid] = Object.keys(insp).length;
+    for (const id in insp) { const r = insp[id];
+      if (!(r.meshes>8)||r.badPos||!r.boxFinite||!r.anchorsOK) problems.push([rid,id]); }
+    if (!IW.sane()) problems.push([rid,'NaN']);
+  }
+  // tint:各區代表種身體色應吻合(morpho 藍 / monarch 橙 / orchid 粉)
+  const tint = { morpho:(IW.switchRegion('samerica'),IW.focus('morpho'),IW.bodyColor()),
+                 monarch:(IW.switchRegion('namerica'),IW.focus('monarch'),IW.bodyColor()) };
+  return { summary, problems, tint };
+})()
+```
+
+判讀:`summary` = { taiwan:12, 其餘各 4 };`problems` 為空;`bodyColor()` 回傳的色碼吻合物種體色(藍閃蝶 `#2f6bd8`、帝王斑蝶 `#e07a1e`);台灣種 `bodyColor()` 為 `#ffffff`(未染色,靠貼圖上色)。
+
 ## 驗證紀錄
 
 - **2026-07-06 首版(Claude Opus 4.8 建立)**:

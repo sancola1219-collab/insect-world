@@ -1,5 +1,5 @@
 // ui.js — 全部 DOM 介面。只反映狀態 + 發出回呼,不持有遊戲邏輯。
-import { INSECTS, byId } from './data.js';
+import { INSECTS, byId, REGIONS, regionInsects } from './data.js';
 
 export function createUI(handlers) {
   const $ = (id) => document.getElementById(id);
@@ -11,7 +11,7 @@ export function createUI(handlers) {
     btnTour: $('btn-tour'), tourBar: $('tour-bar'), tourName: $('tour-name'), tourText: $('tour-text'),
     tourPrev: $('tour-prev'), tourNext: $('tour-next'), tourExit: $('tour-exit'),
     btnHelp: $('btn-help'), helpOverlay: $('help-overlay'), btnCloseHelp: $('btn-close-help'),
-    sceneRoot: $('scene-root'),
+    sceneRoot: $('scene-root'), regionBar: $('region-bar'),
     lifeBar: $('life-bar'), lifeTrack: $('life-track'), lifeKind: $('life-kind'),
     lifeName: $('life-name'), lifeDesc: $('life-desc'),
     lifePrev: $('life-prev'), lifePlay: $('life-play'), lifeNext: $('life-next'), lifeClose: $('life-close'),
@@ -23,18 +23,35 @@ export function createUI(handlers) {
   document.body.appendChild(labelLayer);
   let labelNodes = new Map();
 
-  // ---- 圖鑑清單 ----
-  INSECTS.forEach((sp) => {
-    const item = document.createElement('button');
-    item.className = 'species-item';
-    item.dataset.id = sp.id;
-    item.innerHTML = `
-      <span class="chip" style="--c:${sp.accent}"></span>
-      <span class="si-text"><b>${sp.name}</b><i>${sp.order}</i></span>
-      <span class="si-len">${fmtLen(sp.lengthMM)}</span>`;
-    item.addEventListener('click', () => handlers.onSelect(sp.id));
-    el.speciesList.appendChild(item);
+  // ---- 區域切換列 ----
+  REGIONS.forEach((r) => {
+    const pill = document.createElement('button');
+    pill.className = 'region-pill';
+    pill.dataset.region = r.id;
+    pill.textContent = r.name;
+    pill.title = r.blurb;
+    pill.addEventListener('click', () => handlers.onRegion(r.id));
+    el.regionBar.appendChild(pill);
   });
+
+  // ---- 圖鑑清單(依區域重建) ----
+  function setSpeciesList(insects) {
+    el.speciesList.innerHTML = '';
+    insects.forEach((sp) => {
+      const item = document.createElement('button');
+      item.className = 'species-item';
+      item.dataset.id = sp.id;
+      item.innerHTML = `
+        <span class="chip" style="--c:${sp.accent}"></span>
+        <span class="si-text"><b>${sp.name}</b><i>${sp.order}</i></span>
+        <span class="si-len">${fmtLen(sp.lengthMM)}</span>`;
+      item.addEventListener('click', () => handlers.onSelect(sp.id));
+      el.speciesList.appendChild(item);
+    });
+  }
+  function setActiveRegion(rid) {
+    el.regionBar.querySelectorAll('.region-pill').forEach((n) => n.classList.toggle('active', n.dataset.region === rid));
+  }
 
   el.btnOverview.addEventListener('click', () => handlers.onOverview());
   el.btnClose.addEventListener('click', () => handlers.onOverview());
@@ -148,6 +165,7 @@ export function createUI(handlers) {
     hideLoader, setView, setActiveSpecies, showInfo, hideInfo, setScaleReadout,
     setAnatomy, setMotion, buildLabels, positionLabels, showTour, hideTour,
     showLifecycle, setLifeStage, setLifePlaying, hideLifecycle,
+    setSpeciesList, setActiveRegion,
     sceneRoot: el.sceneRoot,
   };
 }
