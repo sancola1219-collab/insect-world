@@ -64,15 +64,17 @@ function anchor(group, anchors, key, x, y, z) {
   return o;
 }
 
-// 平面翅膀(以 Shape 生成葉形),plane 面朝 +Y
+// 平面翅膀:翅根在原點,翅端指向 +Z(往體側伸展),弦(前後)沿 ±X,平躺於 XZ 面。
+// 這樣掛在胸部兩側後,翅膀是往「身體兩側」張開,而不是往頭部前方伸(修正翅長在頭上的錯誤)。
+// 前緣(往頭 +X)較長、後緣(-X)較短,翅端稍微後掠。
 function wingMesh(len, wid, mat, curveBack = 0.35) {
   const s = new THREE.Shape();
+  // 2D 作圖:X = 弦(前 +X / 後 -X),Y = 翅根→翅端長度
   s.moveTo(0, 0);
-  s.bezierCurveTo(len * 0.2, wid, len * 0.75, wid, len, wid * curveBack);
-  s.bezierCurveTo(len * 1.02, wid * 0.05, len * 0.9, -wid * 0.25, len * 0.55, -wid * 0.35);
-  s.bezierCurveTo(len * 0.25, -wid * 0.4, len * 0.08, -wid * 0.2, 0, 0);
+  s.bezierCurveTo(wid, len * 0.2, wid, len * 0.72, wid * curveBack, len);      // 前緣 → 翅端
+  s.bezierCurveTo(wid * 0.05, len * 1.02, -wid * 0.28, len * 0.9, -wid * 0.4, len * 0.55); // 翅端 → 後緣
+  s.bezierCurveTo(-wid * 0.42, len * 0.28, -wid * 0.2, len * 0.08, 0, 0);      // 後緣 → 翅根
   const g = new THREE.ShapeGeometry(s, 24);
-  // 產生 UV(0..1)
   g.computeBoundingBox();
   const bb = g.boundingBox, uv = [];
   const pos = g.attributes.position;
@@ -81,14 +83,15 @@ function wingMesh(len, wid, mat, curveBack = 0.35) {
   }
   g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
   const m = new THREE.Mesh(g, mat);
-  m.rotation.x = -Math.PI / 2; // 平躺
+  m.rotation.x = Math.PI / 2;  // 立起的 2D 面 → 平躺:長度 +Y 轉到 +Z(體側)
   m.userData.isWing = true;    // 供生命週期「若蟲去翅」辨識
   return m;
 }
 
 // ================= 各昆蟲 =================
 
-function butterfly() {
+function butterfly(feat = {}) {
+  const ws = feat.wingScale || 1;   // 皇蛾/月亮蛾等大型蛾翅特別大
   const group = new THREE.Group();
   const anchors = {};
   const body = chitinMat('#241a2e', 0.5);
@@ -113,12 +116,12 @@ function butterfly() {
   const wings = [];
   [-1, 1].forEach((s) => {
     const fore = new THREE.Group();
-    const fw = wingMesh(0.5, 0.4, wingMat); fw.position.set(0, 0, 0);
-    fore.add(fw); fore.position.set(0.08, 0.02, s * 0.08); fore.scale.z = s;
+    const fw = wingMesh(0.52 * ws, 0.32 * ws, wingMat); fw.position.set(0, 0, 0);
+    fore.add(fw); fore.position.set(0.04, 0.02, s * 0.07); fore.scale.z = s;
     group.add(fore);
     const hind = new THREE.Group();
-    const hw = wingMesh(0.34, 0.34, wingMat);
-    hind.add(hw); hind.position.set(-0.12, 0, s * 0.08); hind.scale.z = s;
+    const hw = wingMesh(0.36 * ws, 0.3 * ws, wingMat);
+    hind.add(hw); hind.position.set(-0.16, 0, s * 0.07); hind.scale.z = s;
     group.add(hind);
     wings.push({ fore, hind, s });
   });
@@ -126,7 +129,7 @@ function butterfly() {
   anchor(group, anchors, 'antenna', 0.39, 0.3, 0.13);
   anchor(group, anchors, 'proboscis', 0.28, -0.12, 0);
   anchor(group, anchors, 'thorax', 0.05, 0.14, 0);
-  anchor(group, anchors, 'wing', 0.2, 0.05, 0.5);
+  anchor(group, anchors, 'wing', 0.16, 0.05, 0.5 * ws);
   anchor(group, anchors, 'abdomen', -0.35, 0, 0);
   anchor(group, anchors, 'leg', 0.0, -0.12, 0.1);
   addLegs(group, 0.05, 0.08, 0.18, 0.012, body, { droop: 0.7, spanZ: 0.1 });
@@ -138,7 +141,7 @@ function butterfly() {
   return { group, anchors, animate, baseLength: 1.0 };
 }
 
-function beetle() {
+function beetle(feat = {}) {
   const group = new THREE.Group();
   const anchors = {};
   const shell = chitinMat('#3a2412', 0.35, { metalness: 0.35, clearcoat: 0.8, clearcoatRoughness: 0.25, iridescence: 0.3, iridescenceIOR: 2.0 });
@@ -151,18 +154,22 @@ function beetle() {
   const pron = segment(0.18, 0.14, 0.24, shell); pron.position.set(0.24, 0.06, 0); group.add(pron);
   // 頭
   const head = segment(0.1, 0.09, 0.14, dark); head.position.set(0.42, 0.02, 0); group.add(head);
-  // 頭角(分叉)
+  // 頭角與胸角(以頭部為支點成一組,可依區域物種放大 hornScale——長戟/南洋大兜角特別長)
   const hornMat = dark;
-  const hornBase = tube([[0.46, 0.04, 0], [0.6, 0.16, 0], [0.66, 0.3, 0]], 0.05, 0.03, hornMat);
-  group.add(hornBase);
-  [-1, 1].forEach((s) => { const tip = tube([[0.66, 0.3, 0], [0.72, 0.42, s * 0.05], [0.74, 0.5, s * 0.09]], 0.025, 0.012, hornMat); group.add(tip); });
-  // 前胸小角
-  const pronHorn = tube([[0.3, 0.16, 0], [0.42, 0.26, 0], [0.4, 0.34, 0]], 0.04, 0.015, hornMat); group.add(pronHorn);
+  const hs = feat.hornScale || 1;
+  const pivot = [0.44, 0.04, 0];
+  const rel = (p) => [p[0] - pivot[0], p[1] - pivot[1], p[2] - pivot[2]];
+  const hornGroup = new THREE.Group(); hornGroup.position.set(...pivot);
+  hornGroup.add(tube([rel([0.46, 0.04, 0]), rel([0.6, 0.16, 0]), rel([0.66, 0.3, 0])], 0.05, 0.03, hornMat));
+  [-1, 1].forEach((s) => hornGroup.add(tube([rel([0.66, 0.3, 0]), rel([0.72, 0.42, s * 0.05]), rel([0.74, 0.5, s * 0.09])], 0.025, 0.012, hornMat)));
+  hornGroup.add(tube([rel([0.3, 0.16, 0]), rel([0.42, 0.26, 0]), rel([0.4, 0.34, 0])], 0.04, 0.015, hornMat)); // 胸角
+  hornGroup.scale.set(hs, hs, hs);
+  group.add(hornGroup);
   // 複眼
   [-1, 1].forEach((s) => { const e = segment(0.04, 0.04, 0.04, eyeMat('#0c0a08')); e.position.set(0.44, 0.06, s * 0.1); group.add(e); });
   // 足(具鉤)
   const legs = addLegs(group, 0.1, 0.24, 0.34, 0.03, dark, { droop: 0.55, spanZ: 0.3 });
-  anchor(group, anchors, 'horn', 0.74, 0.54, 0);
+  anchor(group, anchors, 'horn', 0.44 + 0.32 * hs, 0.04 + 0.5 * hs, 0);
   anchor(group, anchors, 'head', 0.46, 0.0, 0.12);
   anchor(group, anchors, 'thorax', 0.24, 0.22, 0);
   anchor(group, anchors, 'elytra', -0.2, 0.36, 0);
@@ -593,9 +600,9 @@ function applyTint(group, tint) {
   });
 }
 
-// 建構並回傳(套用陰影旗標;opts.tint 依區域物種染色)
+// 建構並回傳(套用陰影旗標;opts.tint 染色、opts.feat 區域特徵如角長/翅大小)
 export function buildInsect(kind, opts = {}) {
-  const b = (BUILDERS[kind] || butterfly)();
+  const b = (BUILDERS[kind] || butterfly)(opts.feat || {});
   if (opts.tint) applyTint(b.group, opts.tint);
   b.group.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false; } });
   b.group.userData.kind = kind;

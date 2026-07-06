@@ -140,6 +140,7 @@ function focusSpecies(id, animate) {
   ui.buildLabels(id);
   ui.setView('昆蟲特寫 · ' + sp.name);
   ui.setScaleReadout('實際體長 ' + realLen(sp));
+  document.body.classList.add('focus-mode');
   following = true;
   flyToStation(st, animate);
 }
@@ -152,6 +153,7 @@ function goOverview(animate) {
   ui.hideInfo();
   ui.setView('生態全景');
   ui.setScaleReadout('真實相對比例');
+  document.body.classList.remove('focus-mode');
   following = false;
   const f = habitat.overviewFrame;
   flyTo(new THREE.Vector3(0, f.height, f.distance), f.center.clone(), animate);
@@ -161,8 +163,8 @@ function setAnatomy(on) { state.anatomy = on; ui.setAnatomy(on); }
 function setMotion(on) { state.motion = on; ui.setMotion(on); }
 
 // ---------- 導覽 ----------
-function startTour() { state.tourIdx = 0; applyTour(); }
-function stopTour() { state.tourIdx = null; ui.hideTour(); }
+function startTour() { state.tourIdx = 0; document.body.classList.add('tour-mode'); applyTour(); }
+function stopTour() { state.tourIdx = null; document.body.classList.remove('tour-mode'); ui.hideTour(); }
 function tourNav(d) {
   if (state.tourIdx === null) return;
   const tour = currentTour();
@@ -203,6 +205,7 @@ function openLifecycle() {
   const sp = byId(state.focus); const st = habitat.stations.get(state.focus);
   ensureStages(st, sp);
   ui.showLifecycle(sp);
+  document.body.classList.add('life-mode');
   state.lifePlaying = true; ui.setLifePlaying(true);
   lifeTimer = 0;
   gotoLifeStage(0);
@@ -229,13 +232,21 @@ function closeLifecycle(reframe) {
     if (reframe && st) flyToStation(st, true);
   }
   state.lifeStage = null; state.lifePlaying = false;
+  document.body.classList.remove('life-mode');
   ui.hideLifecycle();
 }
 
 // ---------- 相機 ----------
+// 手機時底部有資料卡抽屜,把聚焦目標下移,讓昆蟲顯示在可見帶(卡片上方)
+const isMobile = () => window.innerWidth <= 640;
+function aimOf(st, radius) {
+  const p = st.worldPos();
+  if (isMobile()) p.y -= radius * 0.7;   // 目標下移 → 昆蟲在畫面上方
+  return p;
+}
 function flyToStation(st, animate) { flyToStageRadius(st, st.radius, animate); }
 function flyToStageRadius(st, radius, animate) {
-  const target = st.worldPos();
+  const target = aimOf(st, radius);
   const dist = radius * 4.4 + 0.3;
   const dir = new THREE.Vector3(0.9, 0.55, 1.15).normalize();
   const camPos = target.clone().add(dir.multiplyScalar(dist));
@@ -261,7 +272,7 @@ function updateCamera(dt) {
   } else if (following && state.focus) {
     // 目標平滑跟隨(昆蟲在 focus 時漫遊幅度已收斂,微幅跟即可)
     const st = habitat.stations.get(state.focus);
-    if (st) controls.target.lerp(st.worldPos(), 0.1);
+    if (st) { const r = (state.lifeStage !== null && st.life) ? st.life.radii[state.lifeStage] : st.radius; controls.target.lerp(aimOf(st, r), 0.1); }
   }
   controls.update();
 }
@@ -432,6 +443,55 @@ function exposeTestAPI() {
     labelCount() { return document.querySelectorAll('#label-layer .anno').length; },
     visibleLabels() { return [...document.querySelectorAll('#label-layer .anno')].filter((n) => n.style.opacity === '1').length; },
     contextLost: () => contextLost,
+    // 構造審查:回傳聚焦昆蟲在「模型本地座標」下的翅/身體/頭部範圍(驗證翅膀著生正確)
+    audit() {
+      if (!state.focus) return null;
+      const st = habitat.stations.get(state.focus); const g = st.insect.group;
+      g.updateWorldMatrix(true, true);
+      const inv = new THREE.Matrix4().copy(g.matrixWorld).invert();
+      const wing = new THREE.Box3(); wing.makeEmpty();
+      const body = new THREE.Box3(); body.makeEmpty();
+      const v = new THREE.Vector3();
+      g.traverse((o) => {
+        if (!o.isMesh || !o.geometry) return;
+        const pos = o.geometry.attributes.position; if (!pos) return;
+        o.updateWorldMatrix(true, false);
+        const m = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld);
+        const target = o.userData.isWing ? wing : body;
+        for (let i = 0; i < pos.count; i += 3) { v.fromBufferAttribute(pos, i).applyMatrix4(m); target.expandByPoint(v); }
+      });
+      const A = st.insect.anchors;
+      const local = (k) => { const a = A[k]; if (!a) return null; a.updateWorldMatrix(true, false); return new THREE.Vector3().setFromMatrixPosition(a.matrixWorld).applyMatrix4(inv); };
+      const rnd = (b) => b.isEmpty() ? null : { min: [b.min.x, b.min.y, b.min.z].map((n) => +n.toFixed(2)), max: [b.max.x, b.max.y, b.max.z].map((n) => +n.toFixed(2)) };
+      const head = local('head');
+      return { wing: rnd(wing), body: rnd(body), headX: head ? +head.x.toFixed(2) : null,
+        wingSpreadsSideways: wing.isEmpty() ? null : (wing.max.z - wing.min.z) > (wing.max.x - wing.min.x),
+        wingPastHead: (wing.isEmpty() || !head) ? null : (wing.max.x > head.x + 0.03) };
+    },
+    // 聚焦昆蟲所有構造 anchor 的模型本地座標(驗證著生位置合理)
+    anchorsLocal() {
+      if (!state.focus) return null;
+      const st = habitat.stations.get(state.focus); const g = st.insect.group;
+      g.updateWorldMatrix(true, true);
+      const inv = new THREE.Matrix4().copy(g.matrixWorld).invert();
+      const out = {};
+      for (const k in st.insect.anchors) {
+        const a = st.insect.anchors[k]; a.updateWorldMatrix(true, false);
+        const p = new THREE.Vector3().setFromMatrixPosition(a.matrixWorld).applyMatrix4(inv);
+        out[k] = [+p.x.toFixed(2), +p.y.toFixed(2), +p.z.toFixed(2)];
+      }
+      return out;
+    },
+    // 聚焦昆蟲某部位投影到畫面的座標(驗證手機取景是否在可見帶)
+    project(key = 'thorax') {
+      if (!state.focus) return null;
+      const st = habitat.stations.get(state.focus);
+      const wp = st.anchorWorld(key) || st.worldPos();
+      const p = wp.clone().project(camera);
+      const w = renderer.domElement.clientWidth || sizeW();
+      const h = renderer.domElement.clientHeight || sizeH();
+      return { x: Math.round((p.x * 0.5 + 0.5) * w), y: Math.round((-p.y * 0.5 + 0.5) * h), inFront: p.z < 1 };
+    },
     // 目前聚焦昆蟲最主要的身體材質顏色(驗證區域染色 tint 是否生效,免 GPU)
     bodyColor() {
       if (!state.focus) return null;

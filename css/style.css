@@ -243,19 +243,62 @@ button{font-family:inherit;color:inherit;cursor:pointer;border:none;background:n
 .help-foot{font-size:11.5px;color:var(--muted-2);border-top:1px solid var(--line);
   padding-top:14px;line-height:1.6}
 
-/* ---------- 響應式 ---------- */
-@media (max-width:820px){
-  #species-panel{width:220px;top:78px}
-  #info-panel{width:min(340px,calc(100vw - 40px));top:auto;bottom:86px;max-height:52vh}
+/* ---------- 響應式:平板 ---------- */
+@media (max-width:900px){
+  #species-panel{width:220px}
+  #info-panel{width:min(330px,calc(100vw - 32px))}
   .anno-box{max-width:150px}
   .anno-box i{display:none}
 }
-@media (max-width:560px){
-  #species-panel{left:10px;right:10px;width:auto;max-height:34vh;top:74px}
-  #controls{gap:10px;padding:9px 12px;flex-wrap:wrap;justify-content:center;
-    width:calc(100vw - 20px)}
-  .ctrl-group.grow{display:none}
+
+/* ---------- 響應式:手機 ---------- */
+/* 原則:頂部只留精簡列,底部只留「單一情境抽屜」,中間 3D 畫面永遠看得見。 */
+@media (max-width:640px){
+  #topbar{padding:9px 12px;gap:8px}
   .brand-sub{display:none}
+  .brand-glyph{width:30px;height:30px}
+  .brand-title{font-size:16px}
+  .view-indicator{padding:5px 11px;font-size:11.5px}
+  .ghost-btn{width:32px;height:32px;font-size:15px}
+
+  #region-bar{top:54px;max-width:calc(100vw - 12px);padding:4px}
+  .region-pill{padding:6px 12px;font-size:12px}
+
+  /* 底部情境抽屜共同定位:貼齊控制列上方,只會有一個顯示 */
+  #species-panel,#info-panel,#tour-bar,#life-bar{
+    left:0;right:0;bottom:54px;top:auto;width:auto;max-width:none;transform:none;
+    border-radius:16px 16px 0 0;border-left:none;border-right:none}
+
+  /* 圖鑑:底部水平捲動條(全景時,固定高度的一列) */
+  #species-panel{height:78px;max-height:78px;background:var(--glass-2)}
+  .panel-head,.panel-foot{display:none}
+  .species-list{flex:1;flex-direction:row;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;
+    gap:8px;padding:8px 10px;align-items:stretch}
+  .species-item{flex:0 0 auto;width:auto;flex-direction:column;justify-content:center;
+    align-items:flex-start;gap:2px;padding:6px 11px;border:1px solid var(--line);border-radius:11px}
+  .si-text i{max-width:100px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .si-len{display:none}
+  body.focus-mode #species-panel{display:none}   /* 聚焦時讓位給資料卡 */
+
+  /* 資料卡:底部抽屜(聚焦才出現;限高,讓昆蟲特寫在上方看得見) */
+  #info-panel{max-height:42vh;padding:15px 18px}
+  body.life-mode #info-panel,body.tour-mode #info-panel{display:none} /* 播放/導覽時讓位 */
+
+  /* 導覽/生命週期:同一個底部位置 */
+  #tour-bar{gap:8px;padding:11px 12px}
+  #life-bar{flex-wrap:wrap;gap:9px;padding:11px 12px}
+  .life-main{order:3;flex-basis:100%}
+
+  /* 控制列:貼底、全寬、精簡 */
+  #controls{left:0;right:0;bottom:0;transform:none;width:100%;border-radius:0;
+    border-left:none;border-right:none;border-bottom:none;justify-content:space-around;
+    gap:6px;padding:7px 8px}
+  .ctrl-group.grow{display:none}
+  .ctrl-label{font-size:10px}
+
+  .anno-box{max-width:120px;padding:5px 8px}
+  .anno-box i{display:none}
+  .overlay-card{padding:22px 20px}
 }
 
 /* 捲軸 */

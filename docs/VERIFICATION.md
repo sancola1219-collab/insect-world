@@ -147,6 +147,28 @@
 
 判讀:`summary` = { taiwan:12, 其餘各 4 };`problems` 為空;`bodyColor()` 回傳的色碼吻合物種體色(藍閃蝶 `#2f6bd8`、帝王斑蝶 `#e07a1e`);台灣種 `bodyColor()` 為 `#ffffff`(未染色,靠貼圖上色)。
 
+## 構造與手機驗證
+
+```js
+(() => {
+  const IW = window.__IW; IW.forceSize(900,700); IW.setMotion(false);
+  const bad = [];
+  IW.switchRegion('taiwan');
+  for (const id of IW.species()) { IW.focus(id); IW.settle(4);
+    const a = IW.audit(); const an = IW.anchorsLocal();
+    if (a.wing && !a.wingSpreadsSideways) bad.push([id,'翅未往體側']);
+    if (an.head && an.abdomen && an.head[0] <= an.abdomen[0]) bad.push([id,'頭不在前']);
+    if (an.leg && an.leg[1] > 0.05) bad.push([id,'足不在下']);
+  }
+  return { structureProblems: bad };  // 應為空
+})()
+```
+
+- 構造:`__IW.audit()` 的 `wingSpreadsSideways` 全 true、`wingPastHead` 僅蝴蝶(展翅前掠,正常);
+  `anchorsLocal()` 頭在前、足在下、觸角在頭、翅錨在體側。
+- 旗艦外形:`feat.hornScale` 使長戟大兜角錨 x 由 0.76→0.98;`feat.wingScale` 使皇蛾翅展 ±0.58→±0.84。
+- 手機:`__IW.project('thorax').y` 在 `#info-panel` 上緣之上(昆蟲不被資料卡遮住);全景圖鑑條固定高 78px。
+
 ## 驗證紀錄
 
 - **2026-07-06 首版(Claude Opus 4.8 建立)**:
@@ -161,6 +183,12 @@
   - 導覽:12 站依分類故事順序走完並正確 wrap 回蝴蝶。
   - 像素:本次驗證時 hidden 分頁 context 持續 lost(`ext WEBGL_lose_context` 不可用、無法強制還原),故 sampleRT 全 0——**屬環境限制**;新四種沿用與已驗證 8 種相同的材質/幾何 helper,渲染路徑一致。決定性閘門 CPU inspect 全綠。
 
+- **2026-07-06 構造修正 + 手機 + 區域外形(Fable 5)**:
+  - 翅膀方向修正:`wingMesh` 長軸 +X→+Z,翅膀改往體側張開(修「翅膀長在頭上」)。`__IW.audit()` 全部
+    `wingSpreadsSideways=true`;`anchorsLocal()` 12 種頭在前/足在下/觸角在頭全通過;各區 inspect 無問題。
+  - 手機版面:頂部精簡列 + 底部單一情境抽屜(圖鑑條 78px / 資料卡 42vh),`body` class 切換情境;
+    `aimOf` 手機下移目標,`__IW.project('thorax').y`=251 < 卡片上緣 417(昆蟲可見)。桌機 focusErr 0.036 無回歸。
+  - 旗艦外形 `feat`:長戟/南洋/歌利亞大兜角變長、皇蛾/月亮蛾翅變大;anchors 仍全對、無 NaN、console 無錯誤。
 - **2026-07-06 生命週期播放器(Claude Opus 4.8)**:新增 `js/lifecycle.js` + 播放器。
   - `lifecycle()`:complete(蝴蝶/獨角仙/螢火蟲)四階段卵→幼蟲→蛹→成蟲,幼蟲/蛹 mesh 數各異(毛蟲 20、雞母蟲 11、螢火蟲發光幼蟲 30、懸蛹 7、裸蛹 10);incomplete(蜻蜓/蝗蟲)卵→若蟲→若蟲→成蟲,若蟲由成蟲 clone 去翅;`isAdult` 僅末階段、`sane` true、關閉後成蟲還原 true。
   - 取景(有 settle):四階段 focusError 0.059–0.096。UI:life-bar 顯示、4 進度點、active/kind 標籤正確、播放鈕切 ❚❚。自動播放 2.6s 進一階段(0→1 驗證通過)。

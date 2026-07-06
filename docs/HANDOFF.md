@@ -110,6 +110,12 @@ state.tourIdx  null 或 0..7(導覽進度)
   - `baseLength`:取景用參考長度。
 - 共用零件:`chitinMat`(幾丁質)、`eyeMat`(複眼)、`wingMesh`(翅形)、`tube`(分節肢體)、
   `addLegs`(對稱六足)。結構色用 `MeshPhysicalMaterial` 的 `iridescence`(蝴蝶翅、甲蟲殼)。
+- **翅膀方向鐵律**:`wingMesh` 產出的翅「翅根在原點、翅端指向 +Z(體側)、弦沿 ±X」,掛在胸部兩側後
+  是往**身體兩側**張開。**不要讓翅往 +X(頭前)伸**——那會變成「翅膀長在頭上」(2026-07-06 修過)。
+  拍翅一律用外層 group 的 `rotation.x`(上下擺),左右以 `scale.z = ±1` 鏡射、拍翅角 `×s` 對稱。
+- **區域外形特徵 `feat`**:`buildInsect(kind, {tint, feat})`。目前 `beetle` 讀 `feat.hornScale`(長戟/南洋大兜
+  角特別長,以頭部為支點的 `hornGroup` 縮放、不會與頭脫節)、`butterfly` 讀 `feat.wingScale`(皇蛾/月亮蛾
+  巨翅)。要加旗艦外形就擴充對應 builder + `data.js` 的 `FEAT` 表。
 
 ### 4.4 真實相對比例(`habitat.js`)
 
@@ -124,6 +130,17 @@ state.tourIdx  null 或 0..7(導覽進度)
 2. **快速飛行的昆蟲(蜻蜓 dart)聚焦時會飄出框**:靠加大「目標跟隨 lerp」(0.06→0.1)
    與 focus 時把待機漫遊幅度 damp 到 0.12 收斂,讓牠停在鏡頭中央。
 3. **標註 part key 與 anchor 不對應**會出現「有標題卻不知指向哪」:`inspect().anchorsOK` 專門守這題。
+4. **翅膀曾往頭前伸(翅長在頭上)**:`wingMesh` 的長軸原本是 +X → 改成 +Z(體側)。用 `__IW.audit()`
+   看 `wingSpreadsSideways`(翅在 ±Z)與 `wingPastHead`(翅前緣是否越過頭)守這題。
+
+### 4.6 手機版面(RWD)
+
+- 手機(≤640px)把面板改成「頂部精簡列 + 底部單一情境抽屜」,中間 3D 畫面永遠看得見:
+  - 全景 → 底部水平捲動的**圖鑑條**(固定高 78px);聚焦 → 底部**資料卡抽屜**(≤42vh)。
+  - 只有一個抽屜會出現:`main.js` 依情境切 `body` class `focus-mode` / `life-mode` / `tour-mode`,
+    CSS 據此隱藏其他抽屜(見 `style.css` 手機 media query)。
+- **聚焦取景會被底部卡片擋住** → `main.js` 的 `aimOf(st, radius)` 在 `isMobile()` 時把相機目標下移
+  `radius×0.7`,讓昆蟲顯示在卡片上方的可見帶。用 `__IW.project('thorax')` 驗證昆蟲在 `info-panel` 上緣之上。
 
 ## 5. 發佈(GitHub Pages)
 

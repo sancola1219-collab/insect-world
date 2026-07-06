@@ -107,7 +107,7 @@ export function createHabitat(scene) {
 
   function buildStation(sp, place) {
     if (stations.has(sp.id)) return stations.get(sp.id);
-    const built = buildInsect(sp.builder, { tint: sp.tint });
+    const built = buildInsect(sp.builder, { tint: sp.tint, feat: sp.feat });
     const scale = (sp.lengthMM * MM) / built.baseLength;
     const pivot = new THREE.Group();
     pivot.position.set(...place.home);

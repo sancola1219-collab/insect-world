@@ -734,6 +734,14 @@ const WORLD = [
 INSECTS.forEach((s) => { if (!s.region) s.region = 'taiwan'; });
 INSECTS.push(...WORLD);
 
+// 區域特徵:少數旗艦物種的外形強化(角特別長的大兜、翅特別大的巨蛾)
+const FEAT = {
+  hercules: { hornScale: 1.7 }, atlasbeetle: { hornScale: 1.5 },
+  goliath: { hornScale: 1.3 }, easternhercules: { hornScale: 1.35 },
+  atlasmoth: { wingScale: 1.5 }, moonmoth: { wingScale: 1.32 },
+};
+INSECTS.forEach((s) => { if (FEAT[s.id]) s.feat = FEAT[s.id]; });
+
 // ---------- 區域 ----------
 export const REGIONS = [
   { id: 'taiwan',    name: '台灣',      blurb: '一片盛夏草地上的十二種台灣常見昆蟲。' },
