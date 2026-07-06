@@ -348,7 +348,7 @@ function wireInput() {
   });
 }
 function pick(ray) {
-  const pivots = habitat.activeStations().map((s) => s.pivot); // 只在目前區域內拾取
+  const pivots = habitat.pickables(); // 目前區域的主角站點 + 散佈複本(皆反查到物種)
   const hits = ray.intersectObjects(pivots, true);
   if (!hits.length) return null;
   let o = hits[0].object;
@@ -443,6 +443,17 @@ function exposeTestAPI() {
     labelCount() { return document.querySelectorAll('#label-layer .anno').length; },
     visibleLabels() { return [...document.querySelectorAll('#label-layer .anno')].filter((n) => n.style.opacity === '1').length; },
     contextLost: () => contextLost,
+    // 可點選對象數(主角站點 + 散佈複本)與畫面覆蓋(在 NDC 網格打射線,看命中幾種昆蟲)
+    pickCount: () => habitat.pickables().length,
+    probePicks(n = 11) {
+      const ray = new THREE.Raycaster(); const hitIds = new Set(); let hits = 0;
+      for (let iy = 0; iy < n; iy++) for (let ix = 0; ix < n; ix++) {
+        const x = (ix / (n - 1)) * 2 - 1, y = (iy / (n - 1)) * 2 - 1;
+        ray.setFromCamera(new THREE.Vector2(x, y), camera);
+        const id = pick(ray); if (id) { hits++; hitIds.add(id); }
+      }
+      return { rays: n * n, insectHits: hits, distinctSpecies: [...hitIds] };
+    },
     // 構造審查:回傳聚焦昆蟲在「模型本地座標」下的翅/身體/頭部範圍(驗證翅膀著生正確)
     audit() {
       if (!state.focus) return null;

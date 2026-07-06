@@ -85,60 +85,11 @@ export function createHabitat(scene) {
   sky.name = 'sky'; group.add(sky);
   scene.fog = new THREE.Fog(0xd7ead0, 22, 68);
 
-  // ---- 環境昆蟲群(讓畫面熱鬧;純裝飾、不可點選、不進 stations) ----
-  const ambient = (() => {
-    const ag = new THREE.Group(); group.add(ag);
-    const rnd = mulberry(70701);
-    const TINTS = ['#e08a3a', '#6b6bd8', '#e0c040', '#d85050', '#6fae5a', '#5aa0d0', '#eae6dc', '#c060a0'];
-    // 飛舞的小蝴蝶
-    const flyers = [];
-    for (let i = 0; i < 18; i++) {
-      const g2 = new THREE.Group();
-      const col = TINTS[Math.floor(rnd() * TINTS.length)];
-      const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.022, 0.12, 4, 6), new THREE.MeshStandardMaterial({ color: '#2a2320', roughness: 0.6 }));
-      body.rotation.z = Math.PI / 2; g2.add(body);
-      const wmat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.45, metalness: 0.1, side: THREE.DoubleSide, transparent: true, opacity: 0.94 });
-      const wings = [];
-      [-1, 1].forEach((s) => {
-        const geom = new THREE.CircleGeometry(0.12, 14); geom.rotateX(-Math.PI / 2); geom.translate(0, 0, 0.11);
-        const wm = new THREE.Mesh(geom, wmat);
-        const w = new THREE.Group(); w.add(wm); w.scale.z = s; g2.add(w); wings.push({ w, s });
-      });
-      g2.scale.setScalar(0.7 + rnd() * 1.0);
-      ag.add(g2);
-      flyers.push({ g2, wings, hx: (rnd() - 0.5) * 30, hz: (rnd() - 0.5) * 30, r: 2 + rnd() * 5, y: 1.4 + rnd() * 7, sp: 0.3 + rnd() * 0.5, ph: rnd() * 6.28, bob: 0.3 + rnd() * 0.6 });
-    }
-    // 空中飄浮的小蟲塵(Points)
-    const N = 280; const pos = new Float32Array(N * 3); const base = new Float32Array(N * 3);
-    for (let i = 0; i < N; i++) { const x = (rnd() - 0.5) * 46, y = 0.4 + rnd() * 9, z = (rnd() - 0.5) * 46; base[i * 3] = x; base[i * 3 + 1] = y; base[i * 3 + 2] = z; pos.set([x, y, z], i * 3); }
-    const pgeo = new THREE.BufferGeometry(); pgeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    const pts = new THREE.Points(pgeo, new THREE.PointsMaterial({ color: '#3b3a2c', size: 0.06, sizeAttenuation: true, transparent: true, opacity: 0.5, depthWrite: false }));
-    pts.frustumCulled = false; ag.add(pts);
-    // 地面爬行的小蟲(螞蟻列)
-    const crawlers = [];
-    for (let i = 0; i < 14; i++) {
-      const m = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), new THREE.MeshStandardMaterial({ color: '#20201e', roughness: 0.5 }));
-      m.scale.set(1.9, 0.7, 0.9); ag.add(m);
-      crawlers.push({ m, cx: (rnd() - 0.5) * 26, cz: (rnd() - 0.5) * 26, r: 1.5 + rnd() * 4, sp: 0.4 + rnd() * 0.7, ph: rnd() * 6.28 });
-    }
-    function update(t) {
-      for (let i = 0; i < flyers.length; i++) {
-        const f = flyers[i]; const a = t * f.sp + f.ph;
-        f.g2.position.set(f.hx + Math.cos(a) * f.r + Math.sin(a * 1.7) * 0.5, f.y + Math.sin(a * 2.1) * f.bob, f.hz + Math.sin(a) * f.r * 0.72);
-        f.g2.rotation.y = -a + Math.PI / 2;
-        const flap = Math.sin(t * 8 + i) * 0.95;
-        f.wings.forEach(({ w, s }) => { w.rotation.x = -flap * s; });
-      }
-      const p = pgeo.attributes.position;
-      for (let i = 0; i < N; i++) { p.array[i * 3] = base[i * 3] + Math.sin(t * 0.5 + i * 1.3) * 0.3; p.array[i * 3 + 1] = base[i * 3 + 1] + Math.sin(t * 0.8 + i) * 0.25; }
-      p.needsUpdate = true;
-      for (const c of crawlers) { const a = t * c.sp + c.ph; c.m.position.set(c.cx + Math.cos(a) * c.r, 0.06, c.cz + Math.sin(a) * c.r); c.m.rotation.y = -a; }
-    }
-    return { update };
-  })();
 
   // ---- 擺放昆蟲(依區域,惰性建置) ----
   const stations = new Map();       // id → station(所有已建置的)
+  const decor = [];                 // 裝飾複本(該區真實物種的多個副本,讓畫面佈滿該區昆蟲)
+  const decorRnd = mulberry(1337);
   const builtRegions = new Set();
   let activeRegion = 'taiwan';
 
@@ -182,12 +133,39 @@ export function createHabitat(scene) {
     return st;
   }
 
+  const decorWeight = (sp) => (sp.lengthMM < 15 ? 3 : sp.lengthMM < 50 ? 2 : 1); // 小蟲多、大蟲少
+  // 散佈該區真實物種的多個複本(共用幾何/材質,只多節點與 draw call)
+  function addDecor(sp, built, region, count) {
+    const scale = (sp.lengthMM * MM) / built.baseLength;
+    const type = (region === 'taiwan' && LAYOUT[sp.id]) ? LAYOUT[sp.id].type : (TYPE_BY_BUILDER[sp.builder] || 'perch');
+    const air = type === 'flit' || type === 'dart' || type === 'hover' || type === 'tree';
+    for (let k = 0; k < count; k++) {
+      const clone = built.group.clone(true);
+      // 收集拍翅樞紐(翅膜 mesh 的父群組即 fore/hind),記住基礎角度
+      const flappers = [];
+      clone.traverse((o) => { if (o.userData && o.userData.isWing && o.parent && !flappers.includes(o.parent)) { o.parent.userData.baseRotX = o.parent.rotation.x; flappers.push(o.parent); } });
+      const inner = new THREE.Group(); inner.scale.setScalar(scale); inner.add(clone);
+      const pivot = new THREE.Group(); pivot.add(inner); pivot.visible = false;
+      group.add(pivot);
+      pivot.traverse((o) => (o.userData.stationId = sp.id));   // 點任一複本 → 聚焦該種
+      const ang = decorRnd() * Math.PI * 2, rad = 3.5 + decorRnd() * 12;
+      const y = type === 'walk' ? 0.12 : type === 'crawl' ? 0.9 : air ? (1.4 + decorRnd() * 6) : 0.7;
+      const home = new THREE.Vector3(Math.cos(ang) * rad, y, Math.sin(ang) * rad);
+      pivot.position.copy(home);
+      decor.push({ pivot, region, type, home, flappers, ph: decorRnd() * 6.28, sp: 0.3 + decorRnd() * 0.6, r: 0.8 + decorRnd() * 2.4, bob: 0.2 + decorRnd() * 0.5 });
+    }
+  }
+
   function ensureRegion(rid) {
     if (builtRegions.has(rid)) return;
     const list = regionInsects(rid);
+    const TARGET = 24;                    // 每區大約散佈這麼多複本,讓畫面佈滿該區昆蟲
+    const wsum = list.reduce((a, sp) => a + decorWeight(sp), 0);
     list.forEach((sp, i) => {
       const place = (rid === 'taiwan' && LAYOUT[sp.id]) ? LAYOUT[sp.id] : slotFor(sp, i, list.length);
-      buildStation(sp, place);
+      const st = buildStation(sp, place);
+      const count = Math.max(1, Math.round(TARGET * decorWeight(sp) / wsum));
+      addDecor(sp, st.insect, rid, count);
     });
     builtRegions.add(rid);
   }
@@ -196,9 +174,32 @@ export function createHabitat(scene) {
     ensureRegion(rid);
     activeRegion = rid;
     for (const st of stations.values()) st.pivot.visible = (st.region === rid);
+    for (const d of decor) d.pivot.visible = (d.region === rid);
     return regionInsects(rid);
   }
   function activeStations() { return [...stations.values()].filter((s) => s.region === activeRegion); }
+  function activeDecor() { return decor.filter((d) => d.region === activeRegion); }
+  // 可點選對象:主角站點 + 該區裝飾複本(都會反查到物種 id)
+  function pickables() { return [...activeStations().map((s) => s.pivot), ...activeDecor().map((d) => d.pivot)]; }
+
+  // 裝飾複本的漫遊 + 拍翅(共用主角的動作型態,較大範圍散開)
+  function animDecor(t) {
+    for (const d of decor) {
+      if (d.region !== activeRegion) continue;
+      const a = t * d.sp + d.ph; const h = d.home; let ox = 0, oy = 0, oz = 0, yaw = 0;
+      switch (d.type) {
+        case 'flit': case 'dart': ox = Math.cos(a) * d.r; oz = Math.sin(a) * d.r * 0.8; oy = Math.sin(a * 1.8) * d.bob; yaw = -a + Math.PI / 2; break;
+        case 'hover': ox = Math.sin(a * 1.3) * 0.6; oz = Math.cos(a) * 0.5; oy = Math.abs(Math.sin(a * 2)) * 0.3; break;
+        case 'tree': oy = Math.sin(a * 0.4) * 0.6; yaw = Math.sin(a * 0.3) * 0.4; break;
+        case 'walk': ox = Math.cos(a) * d.r; oz = Math.sin(a) * d.r; yaw = -a; break;
+        case 'crawl': ox = Math.sin(a * 0.5) * 0.7; oz = Math.cos(a * 0.5) * 0.7; yaw = a * 0.5; break;
+        default: oy = Math.sin(a) * 0.05; yaw = Math.sin(a * 0.5) * 0.2; break; // perch
+      }
+      d.pivot.position.set(h.x + ox, h.y + oy, h.z + oz);
+      d.pivot.rotation.y = yaw;
+      if (d.flappers.length) { const flap = Math.sin(t * 8 + d.ph) * 0.7; for (const p of d.flappers) p.rotation.x = (p.userData.baseRotX || 0) + flap; }
+    }
+  }
 
   // 待機漫遊:依 type 給不同路徑;focused 時 damp→0 收斂到家
   function idle(st, t) {
@@ -228,12 +229,12 @@ export function createHabitat(scene) {
   }
 
   function update(t, dt, motionOn) {
-    ambient.update(t);   // 環境昆蟲群(不受區域影響,永遠讓畫面熱鬧)
     for (const st of stations.values()) {
       if (st.region !== activeRegion) continue;
       idle(st, t);
       st.insect.animate(t, motionOn);
     }
+    animDecor(t);   // 散佈的同種昆蟲複本(讓該區畫面佈滿該種昆蟲)
   }
 
   setRegion('taiwan');   // 預設區域
@@ -241,7 +242,7 @@ export function createHabitat(scene) {
   const overviewFrame = { center: new THREE.Vector3(0, 2.2, 0), distance: 20, height: 8 };
   return {
     group, stations, update, overviewFrame,
-    setRegion, activeStations,
+    setRegion, activeStations, pickables,
     getRegion: () => activeRegion,
   };
 }
