@@ -319,6 +319,21 @@ function exposeTestAPI() {
     labelCount() { return document.querySelectorAll('#label-layer .anno').length; },
     visibleLabels() { return [...document.querySelectorAll('#label-layer .anno')].filter((n) => n.style.opacity === '1').length; },
     contextLost: () => contextLost,
+    // 分層射線檢查(GPU 無關):從目前相機朝畫面上/中/下三點打射線,回報各自命中什麼。
+    // 用來抓「單一物件蓋滿全畫面」的錯誤(例如天球內面外翻)——正常全景應是 上=sky、下=ground。
+    strata() {
+      const ray = new THREE.Raycaster();
+      const hitName = (ndcY) => {
+        ray.setFromCamera(new THREE.Vector2(0, ndcY), camera);
+        const hits = ray.intersectObjects(scene.children, true);
+        if (!hits.length) return 'none(sky)';
+        let o = hits[0].object;
+        while (o) { if (o.userData && o.userData.stationId) return 'insect:' + o.userData.stationId; if (o.name) return o.name; o = o.parent; }
+        return hits[0].object.type;
+      };
+      const top = hitName(0.85), mid = hitName(0), bot = hitName(-0.85);
+      return { top, mid, bot, oneObjectCoversAll: (top === mid && mid === bot && top !== 'none(sky)') };
+    },
     // 離屏取樣:渲染到自有的 WebGLRenderTarget(獨立 FBO,不受 hidden 分頁 compositor 影響)
     sampleRT(size = 256) {
       const rt = new THREE.WebGLRenderTarget(size, size);

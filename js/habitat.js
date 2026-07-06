@@ -33,7 +33,7 @@ export function createHabitat(scene) {
   // ---- 地面 ----
   const groundMat = new THREE.MeshStandardMaterial({ map: TX.ground(), roughness: 0.95, metalness: 0 });
   const ground = new THREE.Mesh(new THREE.CircleGeometry(60, 64), groundMat);
-  ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; group.add(ground);
+  ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; ground.name = 'ground'; group.add(ground);
 
   // ---- 草叢(InstancedMesh 錐形葉片) ----
   const bladeGeo = new THREE.ConeGeometry(0.06, 1.1, 4, 1, true);
@@ -82,7 +82,7 @@ export function createHabitat(scene) {
 
   // ---- 天空 + 霧 ----
   const sky = new THREE.Mesh(new THREE.SphereGeometry(80, 32, 24), new THREE.MeshBasicMaterial({ map: TX.sky(), side: THREE.BackSide, fog: false }));
-  group.add(sky);
+  sky.name = 'sky'; group.add(sky);
   scene.fog = new THREE.Fog(0xd7ead0, 22, 68);
 
   // ---- 擺放昆蟲 ----
