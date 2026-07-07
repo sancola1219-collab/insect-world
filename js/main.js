@@ -443,6 +443,13 @@ function exposeTestAPI() {
     labelCount() { return document.querySelectorAll('#label-layer .anno').length; },
     visibleLabels() { return [...document.querySelectorAll('#label-layer .anno')].filter((n) => n.style.opacity === '1').length; },
     contextLost: () => contextLost,
+    // 目前區域所有昆蟲(主角+複本)的高度分佈,驗證有分佈在空中/樹葉/地面各層
+    heights() {
+      const v = new THREE.Vector3();
+      const ys = habitat.pickables().map((p) => { p.getWorldPosition(v); return +v.y.toFixed(2); });
+      const air = ys.filter((y) => y > 1.8).length, mid = ys.filter((y) => y > 0.45 && y <= 1.8).length, ground = ys.filter((y) => y <= 0.45).length;
+      return { count: ys.length, min: Math.min(...ys), max: Math.max(...ys), air, mid, ground };
+    },
     // 可點選對象數(主角站點 + 散佈複本)與畫面覆蓋(在 NDC 網格打射線,看命中幾種昆蟲)
     pickCount: () => habitat.pickables().length,
     probePicks(n = 11) {
